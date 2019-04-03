@@ -3,6 +3,7 @@
 import json
 import os
 import urllib.request
+
 # import torchtext.vocab as vocab
 
 __all__ = ["Squad"]
@@ -28,6 +29,7 @@ class Squad():
         train_filename = "train-v2.0.json"
         test_filename = "dev-v2.0.json",
         self.filename = train_filename if train else test_filename
+        self.filename = os.path.join(root, self.filename)
 
         url_type = "train" if train else "test"
         urls = {
@@ -56,7 +58,7 @@ class Squad():
                 paragraphs = set['paragraphs']
                 for paragraph in paragraphs:
                     qas = paragraph['qas']
-                    context = paragraph['context']
+                    context = paragraph['context'].lower()
                     qas_ = []
                     for qa in qas:
                         question = qa['question']
@@ -76,9 +78,7 @@ class Squad():
         if not os.path.exists(self.root):
             os.makedirs(self.root)
 
-        self.filename = os.path.join(self.root, self.filename)
         print("Downloading ... ", self.filename)
-
         urllib.request.urlretrieve(self.url, self.filename)
 
     def __iter__(self):
