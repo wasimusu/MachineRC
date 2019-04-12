@@ -14,3 +14,9 @@ class Config:
         self.data_dir = "data/"
         self.model_dir = "model/"
         # Add parameters as required
+
+        # Logs
+        self.print_every = 100
+        self.save_every = 100
+
+        self.num_epochs = 10

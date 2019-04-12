@@ -6,6 +6,10 @@ from squad import Squad
 
 
 class ContextEncoder(nn.Module):
+    """
+    Determine representation / encoding of Context
+    """
+
     def __init__(self, embedding_dim, hidden_dim, bidirectional=False, num_layers=1, batch_size=1, vocab_size=1000):
         super(ContextEncoder, self).__init__()
 
@@ -34,6 +38,10 @@ class ContextEncoder(nn.Module):
 
 
 class QuestionEncoder(nn.Module):
+    """
+    Determine representation of Question
+    """
+
     def __init__(self, embedding_dim, hidden_dim, bidirectional=False, num_layers=1, batch_size=1, vocab_size=1000):
         super(QuestionEncoder, self).__init__()
 
@@ -62,6 +70,10 @@ class QuestionEncoder(nn.Module):
 
 
 class Decoder(nn.Module):
+    """
+    Takes as input concatenation of question encoder and context encoder and outputs start point and end point
+    """
+
     def __init__(self, feature_size, output_size=2):
         super(Decoder, self).__init__()
         self.feature_size = feature_size
