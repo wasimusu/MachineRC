@@ -3,6 +3,67 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 
+class Encoder(nn.Module):
+    def __init__(self, bidirectional, num_layers, batch_size, hidden_size, embeddings):
+        super(Encoder, self).__init__()
+
+        self.embeddings = embeddings
+        self.bidirectional = bidirectional
+        self.num_directions = 2 if bidirectional else 1
+        self.num_layers = num_layers
+        self.batch_size = batch_size
+        self.hidden_size = hidden_size
+
+        self.gru = nn.GRU(hidden_size=hidden_size, bidirectional=bidirectional, num_layers=num_layers)
+        self.hidden = self.init_hidden()
+
+    def forward(self, input):
+        input = self.embeddings(input)  # Convert the numbers into embeddings
+        output, self.hidden = self.gru(input, self.hidden)
+        # A sentinel vector should be added somehow
+        return output
+
+    def init_hidden(self):
+        return torch.zeros(self.num_directions * self.num_layers, self.batch_size, self.hidden_size)
+
+
+class CoattentionNetwork(nn.Module):
+    def __init__(self, hidden_size, num_layers, batch_size, bidrectional=True):
+        super(CoattentionNetwork, self).__init__()
+
+        self.batch_size = batch_size
+        self.num_directions = 2 if bidrectional else 1
+        self.num_layers = num_layers
+
+        self.fusion_bilstm = nn.LSTM(hidden_size=hidden_size * 3, num_layers=num_layers, bidirectional=bidrectional)
+        self.hidden = self.initHidden()
+        self.encoder = Encoder(bidirectional=bidrectional, num_layers=num_layers, batch_size=batch_size)
+        self.decoder = DynamicDecoder(hidden_size=hidden_size, batch_size=batch_size, num_layers=num_layers,
+                                      bidirectional=bidrectional)
+        self.fc_question = nn.Linear(hidden_size, hidden_size)  # l * ( n + 1)
+
+    def forward(self, d_seq, q_seq, d_mask, target_span=None):
+        D = self.encoder(d_seq)
+        Q = self.encoder(q_seq)
+        Q = torch.tanh(self.fc_question(Q))  # This is for questions only
+
+        L = D.tranpose(1, 2).bmm(Q)  # Affinity matrix
+        A_Q = F.softmax(L, 1)  # row-wise normalization to get attention weights each word in question
+        A_D = F.softmax(L, 2)  # column-wise softmax to get attention weights for document
+        C_Q = D.bmm(A_Q)  # C_Q : l * ( n + 1)
+        C_D = torch.cat((Q, C_Q), dim=1).bmm(A_D)  # C_D : 2l * (m + 1)
+        C_D_t = C_D.transpose(1, 2)
+
+        bilstm_in = torch.cat((C_D_t, D), dim=2)
+        # TODO : Different than the other implementation of coattention
+        U, _ = self.fusion_bilstm(bilstm_in, self.hidden)  # U : 2l * m
+
+        return loss, starts, ends
+
+    def initHidden(self):
+        return torch.zeros(self.num_directions * self.num_layers, self.batch_size, self.hidden_size)
+
+
 class HMN(nn.Module):
     def __init__(self, hidden_size):
         super(HMN, self).__init__()
@@ -46,55 +107,4 @@ class DynamicDecoder(nn.Module):
         E = self.beta()
 
     def initHidden(self):
-        return torch.zeros(self.num_directions * self.num_layers, self.batch_size, self.hidden_size)
-
-
-class CoattentionNetwork(nn.Module):
-    def __init__(self, hidden_size, num_layers, batch_size, bidrectional=True):
-        super(CoattentionNetwork, self).__init__()
-
-        self.batch_size = batch_size
-        self.num_directions = 2 if bidrectional else 1
-        self.num_layers = num_layers
-
-        self.fusion_bilstm = nn.LSTM(hidden_size=hidden_size, num_layers=num_layers, bidirectional=bidrectional)
-        self.hidden = self.initHidden()
-
-    def forward(self, D, Q):
-        L = D.tranpose(1, 2).bmm(Q)  # Affinity matrix
-        A_Q = F.softmax(L, 1)  # row-wise normalization to get attention weights each word in question
-        A_D = F.softmax(L, 2)  # column-wise softmax to get attention weights for document
-        C_Q = D.bmm(A_Q)  # C_Q : l * ( n + 1)
-        C_D = torch.cat((Q, C_Q), dim=1).bmm(A_D)  # C_D : 2l * (m + 1)
-        DC = torch.cat((D, C_D), dim=1)
-        U, _ = self.fusion_bilstm(DC, self.hidden)  # U : 2l * m
-        return U
-
-    def initHidden(self):
-        return torch.zeros(self.num_directions * self.num_layers, self.batch_size, self.hidden_size)
-
-
-class Encoder(nn.Module):
-    def __init__(self, bidirectional, num_layers, batch_size, hidden_size, embeddings):
-        super(Encoder, self).__init__()
-
-        self.embeddings = embeddings
-        self.bidirectional = bidirectional
-        self.num_directions = 2 if bidirectional else 1
-        self.num_layers = num_layers
-        self.batch_size = batch_size
-        self.hidden_size = hidden_size
-
-        self.gru = nn.GRU(hidden_size=hidden_size, bidirectional=bidirectional, num_layers=num_layers)
-        self.hidden = self.init_hidden()
-        self.fc_question = nn.Linear(hidden_size, hidden_size)  # l * ( n + 1)
-
-    def forward(self, input):
-        input = self.embeddings(input)  # Convert the numbers into embeddings
-        output, self.hidden = self.gru(input, self.hidden)
-        # A sentinel vector should be added somehow
-        output = torch.tanh(output)  # This is for questions only
-        return output
-
-    def init_hidden(self):
         return torch.zeros(self.num_directions * self.num_layers, self.batch_size, self.hidden_size)
