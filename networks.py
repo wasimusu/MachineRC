@@ -1,10 +1,10 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-
+from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
 
 class Encoder(nn.Module):
-    def __init__(self, bidirectional, num_layers, batch_size, hidden_size, embeddings):
+    def __init__(self, batch_size, hidden_size, embeddings, bidirectional=False, num_layers=1):
         super(Encoder, self).__init__()
 
         self.embeddings = embeddings
@@ -14,12 +14,16 @@ class Encoder(nn.Module):
         self.batch_size = batch_size
         self.hidden_size = hidden_size
 
-        self.gru = nn.GRU(hidden_size=hidden_size, bidirectional=bidirectional, num_layers=num_layers)
+        self.encoder = nn.GRU(hidden_size=hidden_size, bidirectional=bidirectional, num_layers=num_layers,
+                              batch_first=True)
         self.hidden = self.init_hidden()
+        self.sentinel = nn.Parameter(torch.rand(hidden_size, ))
 
-    def forward(self, input):
+    def forward(self, input, mask):
+        lengths = torch.sum(mask, 1)
         input = self.embeddings(input)  # Convert the numbers into embeddings
-        output, self.hidden = self.gru(input, self.hidden)
+        packed = pack_padded_sequence(input, lengths, batch_first=True)
+        output, self.hidden = self.encoder(input, self.hidden)
         # A sentinel vector should be added somehow
         return output
 
