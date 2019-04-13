@@ -46,21 +46,27 @@ class CoattentionNetwork(nn.Module):
                                       bidirectional=bidrectional)
         self.fc_question = nn.Linear(hidden_size, hidden_size)  # l * ( n + 1)
 
-    def forward(self, d_seq, q_seq, d_mask, target_span=None):
-        D = self.encoder(d_seq)
-        Q = self.encoder(q_seq)
+    def forward(self, q_seq, q_mask, d_seq, d_mask, target_span=None):
+        # Variable names match the paper except for D, Q, D_t, and Q_t
+
+        D = self.encoder(d_seq, d_mask)
+        Q = self.encoder(q_seq, q_mask) # Named Q prime in paper
         Q = torch.tanh(self.fc_question(Q))  # This is for questions only
 
-        L = D.tranpose(1, 2).bmm(Q)  # Affinity matrix
+        D_t = torch.transpose(D, 1, 2) # Transpose each matrix in D batch
+        L = torch.bmm(Q, D_t) # Affinity matrix
+
         A_Q = F.softmax(L, 1)  # row-wise normalization to get attention weights each word in question
         A_D = F.softmax(L, 2)  # column-wise softmax to get attention weights for document
-        C_Q = D.bmm(A_Q)  # C_Q : l * ( n + 1)
-        C_D = torch.cat((Q, C_Q), dim=1).bmm(A_D)  # C_D : 2l * (m + 1)
+        C_Q = D.bmm(D_t, A_Q)  # C_Q : B x l x (n + 1)
+
+        Q_t = torch.transpose(Q, 1, 2) # Transpose each matrix in Q batch
+        C_D = torch.cat((Q_t, C_Q), dim=1).bmm(A_D)  # C_D : 2l * (m + 1)
         C_D_t = C_D.transpose(1, 2)
 
         bilstm_in = torch.cat((C_D_t, D), dim=2)
         # TODO : Different than the other implementation of coattention
-        U, _ = self.fusion_bilstm(bilstm_in, self.hidden)  # U : 2l * m
+        U, _ = self.fusion_bilstm(bilstm_in, self.hidden)  # U : 2l x m
 
         return loss, starts, ends
 
