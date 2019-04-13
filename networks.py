@@ -128,16 +128,15 @@ class HMN(nn.Module):
 
         self.loss = nn.CrossEntropyLoss()
 
-    def forward(self, H, U, S, E, target=None):
+    def forward(self, H, U, U_CAT, target=None):
         """
         :param H: hidden state of decoder : h
         :param U: Result of bi-lstm fusion : 2h
-        :param S: Start position : h
-        :param E: End position : h
+        :param U_CAT : concatentation of U corresponding to ith start and end position
         :param target:  ground truth / expected start and end positions : 1 pair for each item in batch
         :return:
         """
-        r = torch.tanh(self.r(torch.cat((H, S, E))).unsqueeze(0))  # r : 1 * l
+        r = torch.tanh(self.r(torch.cat((H, U_CAT))).unsqueeze(0))  # r : 1 * l
 
         M_1, _ = torch.max(self.m_t_1(torch.cat((U, r), dim=1)), dim=1)
         M_1 = M_1.unsqueeze(0)  # M_1 : 1 * l
