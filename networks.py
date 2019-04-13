@@ -106,9 +106,10 @@ class CoattentionNetwork(nn.Module):
 
         bilstm_in = torch.cat((C_D_t, D), dim=2)
         # TODO : Different than the other implementation of coattention
-        U, _ = self.fusion_bilstm(bilstm_in, self.hidden)  # U : 2l x m
+        U = self.fusion_bilstm(bilstm_in, self.hidden)  # U : 2l x m
 
-        return loss, starts, ends
+        loss, index_start, index_end = self.decoder(U, d_mask, target_span)
+        return loss, index_start, index_end
 
     def initHidden(self):
         return torch.zeros(self.num_directions * self.num_layers, self.batch_size, self.hidden_size)
