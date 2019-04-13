@@ -3,9 +3,18 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
 
+
+# TODO : Takes input and produces out of same dimension our reference implementation
 class Encoder(nn.Module):
-    def __init__(self, batch_size, hidden_size, embeddings, bidirectional=False, num_layers=1):
+    """
+    Generate encoding for both question and context
+    """
+
+    def __init__(self, embeddings, hidden_size=300, batch_size=1, bidirectional=False, num_layers=1):
         super(Encoder, self).__init__()
+
+        # TODO : The bottom line is testing stuff
+        # self.embeddings = nn.Embedding(10, hidden_size)     # Just put here to test things out
 
         self.embeddings = embeddings
         self.bidirectional = bidirectional
@@ -14,17 +23,49 @@ class Encoder(nn.Module):
         self.batch_size = batch_size
         self.hidden_size = hidden_size
 
-        self.encoder = nn.GRU(hidden_size=hidden_size, bidirectional=bidirectional, num_layers=num_layers,
+        self.encoder = nn.GRU(input_size=hidden_size, hidden_size=hidden_size, bidirectional=bidirectional,
+                              num_layers=num_layers,
                               batch_first=True)
         self.hidden = self.init_hidden()
         self.sentinel = nn.Parameter(torch.rand(hidden_size, ))
 
     def forward(self, input, mask):
         lengths = torch.sum(mask, 1)
+
         input = self.embeddings(input)  # Convert the numbers into embeddings
         packed = pack_padded_sequence(input, lengths, batch_first=True)
-        output, self.hidden = self.encoder(input, self.hidden)
-        # A sentinel vector should be added somehow
+        output, self.hidden = self.encoder(packed, self.hidden)
+        output, _ = pad_packed_sequence(output, batch_first=True)
+
+        # TODO: A sentinel vector should be added somehow
+        return output
+
+    def init_hidden(self):
+        return torch.zeros(self.num_directions * self.num_layers, self.batch_size, self.hidden_size)
+
+
+# TODO : Takes input and produces out of same dimension our reference implementation
+class FusionBiLSTM(nn.Module):
+    def __init__(self, hidden_size=100, num_layers=1, batch_size=1, bidirectional=True):
+        super(FusionBiLSTM, self).__init__()
+
+        self.bidirectional = bidirectional
+        self.num_directions = 2 if bidirectional else 1
+        self.num_layers = num_layers
+        self.batch_size = batch_size
+        self.hidden_size = hidden_size
+
+        self.fusion_bilstm = nn.GRU(input_size=hidden_size * 3, hidden_size=hidden_size, batch_first=True,
+                                    bidirectional=bidirectional)
+        self.hidden = self.init_hidden()
+
+    def forward(self, input, mask):
+        lengths = torch.sum(mask, 1)
+
+        packed = pack_padded_sequence(input, lengths, batch_first=True)
+        output, self.hidden = self.fusion_bilstm(packed, self.hidden)
+        output, _ = pad_packed_sequence(output, batch_first=True)
+
         return output
 
     def init_hidden(self):
@@ -39,8 +80,7 @@ class CoattentionNetwork(nn.Module):
         self.num_directions = 2 if bidrectional else 1
         self.num_layers = num_layers
 
-        self.fusion_bilstm = nn.LSTM(hidden_size=hidden_size * 3, num_layers=num_layers, bidirectional=bidrectional)
-        self.hidden = self.initHidden()
+        self.fusion_bilstm = FusionBiLSTM(hidden_size=hidden_size)
         self.encoder = Encoder(bidirectional=bidrectional, num_layers=num_layers, batch_size=batch_size)
         self.decoder = DynamicDecoder(hidden_size=hidden_size, batch_size=batch_size, num_layers=num_layers,
                                       bidirectional=bidrectional)
@@ -77,22 +117,30 @@ class CoattentionNetwork(nn.Module):
 class HMN(nn.Module):
     def __init__(self, hidden_size):
         super(HMN, self).__init__()
+        self.hidden_size = hidden_size
 
-        self.fc_d = nn.Linear(hidden_size, hidden_size)
-        self.fc1 = nn.Linear(hidden_size * 2, hidden_size)
-        self.fc2 = nn.Linear(hidden_size, hidden_size)
-        self.fc3 = nn.Linear(hidden_size * 2, hidden_size)  # Output dim could be 1
+        self.r = nn.Linear(hidden_size * 3, hidden_size)
+        self.m_t_1 = nn.Linear(hidden_size * 2, hidden_size)
+        self.m_t_2 = nn.Linear(hidden_size, hidden_size)
+        self.final_fc = nn.Linear(hidden_size * 2, hidden_size)  # Output dim could be 1
 
         # TODO : These are not correct initializations probably
         self.r = torch.rand(1, hidden_size)  # an initial value for r is required
         self.H = torch.rand(1, hidden_size)  # This is not probably the valid value of H
 
-    def forward(self, U, S, E):
-        M_1 = torch.max(self.fc1(torch.cat((U, self.r), dim=1)))
-        M_2 = torch.max(self.fc2(M_1))
-        self.r = torch.tanh(self.fc_d(torch.cat((self.H, S, E))))
+        self.loss = nn.CrossEntropyLoss()
+
+    def forward(self, U, S, E, target=None):
+        M_1 = torch.max(self.m_t_1(torch.cat((U, self.r), dim=1)))
+        M_2 = torch.max(self.m_t_2(M_1))
+        self.r = torch.tanh(self.fc_r(torch.cat((self.H, S, E))))
         score = torch.max(self.fc3(torch.cat((M_1, M_2), dim=1)))
-        return score
+
+        loss = 0
+        if target:
+            loss = 1
+
+        return score, loss
 
 
 class DynamicDecoder(nn.Module):

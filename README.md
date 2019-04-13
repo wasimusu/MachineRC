@@ -20,3 +20,5 @@ Determines start and end points
 * vanillaQA.py contains baseline neural network architecture that might possibly work
 * squad.py contains data parser for Squad Dataset
 * setup.py - you need to run this after installing requirements to download data for nltk
+
+* networks package has all of the networks in separate class for testing purpose
