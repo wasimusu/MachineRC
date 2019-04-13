@@ -114,33 +114,48 @@ class CoattentionNetwork(nn.Module):
         return torch.zeros(self.num_directions * self.num_layers, self.batch_size, self.hidden_size)
 
 
+# TODO : seems okay (for now) but risky to test
 class HMN(nn.Module):
     def __init__(self, hidden_size):
         super(HMN, self).__init__()
         self.hidden_size = hidden_size
 
-        self.r = nn.Linear(hidden_size * 3, hidden_size)
-        self.m_t_1 = nn.Linear(hidden_size * 2, hidden_size)
+        # The four dense / fc layers of HMN
+        self.r = nn.Linear(hidden_size * 5, hidden_size)
+        self.m_t_1 = nn.Linear(hidden_size * 3, hidden_size)
         self.m_t_2 = nn.Linear(hidden_size, hidden_size)
         self.final_fc = nn.Linear(hidden_size * 2, hidden_size)  # Output dim could be 1
 
-        # TODO : These are not correct initializations probably
-        self.r = torch.rand(1, hidden_size)  # an initial value for r is required
-        self.H = torch.rand(1, hidden_size)  # This is not probably the valid value of H
-
         self.loss = nn.CrossEntropyLoss()
 
-    def forward(self, U, S, E, target=None):
-        M_1 = torch.max(self.m_t_1(torch.cat((U, self.r), dim=1)))
-        M_2 = torch.max(self.m_t_2(M_1))
-        self.r = torch.tanh(self.fc_r(torch.cat((self.H, S, E))))
-        score = torch.max(self.fc3(torch.cat((M_1, M_2), dim=1)))
+    def forward(self, H, U, S, E, target=None):
+        """
+        :param H: hidden state of decoder : h
+        :param U: Result of bi-lstm fusion : 2h
+        :param S: Start position : h
+        :param E: End position : h
+        :param target:  ground truth / expected start and end positions : 1 pair for each item in batch
+        :return:
+        """
+        r = torch.tanh(self.r(torch.cat((H, S, E))).unsqueeze(0))  # r : 1 * l
 
-        loss = 0
+        M_1, _ = torch.max(self.m_t_1(torch.cat((U, r), dim=1)), dim=1)
+        M_1 = M_1.unsqueeze(0)  # M_1 : 1 * l
+
+        M_2, _ = torch.max(self.m_t_2(M_1), dim=1)
+        M_2 = M_2.unsqueeze(0)  # M_2 : 1 * l
+
+        score, _ = torch.max(self.fc3(torch.cat((M_1, M_2), dim=1)), dim=1)
+        score = score.unsqueeze(0)
+        score = F.softmax(score, dim=1)
+
+        _, index = torch.max(score, dim=1)
+
+        step_loss = None
         if target:
-            loss = 1
+            step_loss = self.loss(index, target)
 
-        return score, loss
+        return index, step_loss
 
 
 class DynamicDecoder(nn.Module):
