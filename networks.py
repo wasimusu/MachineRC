@@ -88,6 +88,7 @@ class CoattentionNetwork(nn.Module):
 
     def forward(self, q_seq, q_mask, d_seq, d_mask, target_span=None):
         # Variable names match the paper except for D, Q, D_t, and Q_t
+        # which are the transposes of the paper's D, Q, D_t and Q_t
 
         D = self.encoder(d_seq, d_mask)
         Q = self.encoder(q_seq, q_mask) # Named Q prime in paper
@@ -144,25 +145,87 @@ class HMN(nn.Module):
 
 
 class DynamicDecoder(nn.Module):
-    # TODO : Everything
-    def __init__(self, hidden_size, batch_size, num_layers=1, bidirectional=False):
+    """Predicts start and end given embedding and computes loss"""
+
+    def __init__(self, device, hidden_size, batch_size, max_dec_steps,
+                    num_layers=1, bidirectional=False):
         super(DynamicDecoder, self).__init__()
 
+        self.device = device
         self.num_layers = num_layers
         self.batch_size = batch_size
         self.bidirectional = bidirectional
         self.directions = 2 if bidirectional else 1
         self.hidden_size = hidden_size
+        self.max_dec_steps = max_dec_steps
 
-        self.alpha = HMN(hidden_size)
-        self.beta = HMN(hidden_size)
-        self.lstm_dec = nn.LSTM(hidden_size=hidden_size * 2)
+        self.start_hmn = HMN(hidden_size)
+        self.end_hmn = HMN(hidden_size)
+        self.gru = nn.GRU(input_size=hidden_size * 2,
+                        hidden_size=hidden_size,
+                        batch_first=True,
+                        num_layers=num_layers,
+                        bidirectional=bidirectional)
 
-        self.hidden = self.initHidden()
+        # self.hidden = self.initHidden() # for GRU
 
-    def forward(self, input):
-        S = self.alpha()
-        E = self.beta()
+    def forward(self, U, d_mask, target_span):
+        batch_indices = torch.range(self.batch_size)
 
-    def initHidden(self):
-        return torch.zeros(self.num_directions * self.num_layers, self.batch_size, self.hidden_size)
+        # Initialize start estimate to 0
+        s_i = torch.zeros(self.batch_size).long()
+        # Initialize end estimate to last word in document
+        e_i = torch.sum(d_mask, 1) - 1
+
+        # Put vectors on device
+        s_i.to(self.device)
+        e_i.to(self.device)
+        batch_indices.to(self.device)
+
+        # Break up target for convenience
+        s_target = None
+        e_target = None
+        if target_span is not None:
+            s_target = target_span[:, 0]
+            e_target = target_span[:, 1]
+
+        h_i = None # hidden state of GRU
+        cumulative_loss = 0.
+        loss = None
+
+        # Initialize embedding at start estimate
+        u_s_i = U[batch_indices, s_i :] # batch_size x 2l
+
+        # Iterate getting a start and end estimate every iteration
+        for _ in range(self.max_dec_steps):
+            # Update embedding at end estimate
+            u_e_i = U[batch_indices, e_i, :] # batch_size x 2l
+            u_cat = torch.cat((u_s_i, u_e_i), 1) # batch_size x 4l
+
+            # Get hidden state
+            h_i = self.gru(u_cat.unsqueeze(1), h_i)[1]
+
+            # Get new start estimate and start loss
+            s_i, start_loss_i = self.start_hmn(h_i, U, s_i, u_cat, s_target)
+
+            # Update embedding at start estimate
+            u_s_i = U[batch_indices, s_i :] # batch_size x 2l
+
+            # Get new u_cat with updated embedding at start estimate
+            u_cat = torch.cat((u_s_i, u_e_i), 1) # batch_size x 4l
+
+            # Get new end estimate and end loss
+            e_i, end_loss_i = self.end_hmn(h_i, U, e_i, u_cat, e_target)
+
+            # Update cumulative loss if computing loss
+            if target_span is not None:
+                cumulative_loss += start_loss_i + end_loss_i
+
+        # Compute loss
+        if target_span is not None:
+            # Loss is the mean step loss
+            loss = cumulative_loss / self.max_dec_steps
+        return loss, s_i, e_i
+
+    # def initHidden(self):
+    #     return torch.zeros(self.num_directions * self.num_layers, self.batch_size, self.hidden_size)
