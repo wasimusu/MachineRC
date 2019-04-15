@@ -8,7 +8,9 @@ class Config:
         self.num_encoder_layers = 2
         self.bidirectional_encoder = True
         self.embedding_dim = 100
+        self.hidden_size = self.embedding_dim
         self.batch_size = 100
+        self.learning_rate = 0.01
 
         # directories
         self.data_dir = "data/"
