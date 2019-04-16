@@ -14,7 +14,7 @@ sent_tokenizer = PunktSentenceTokenizer()
 
 class BaselineQA:
     def __init__(self):
-        dataset = squad.Squad(train=True)
+        dataset = squad.Squad(train=True, download=False)
         vocab_size = 10000
 
         text = [context for context, qas in dataset]
@@ -33,7 +33,7 @@ class BaselineQA:
 
         self.vectorizer = TfidfVectorizer().fit(sentences)
 
-    def evaluate(self, thresh=0.5):
+    def evaluate(self, thresh=0.1):
         dataset = squad.Squad(train=True)
         for context, qas in dataset:
             sentences = sent_tokenizer.tokenize(context)
@@ -41,11 +41,12 @@ class BaselineQA:
             for qa in qas:
                 question, answer, answer_start, is_impossible = qa
                 question_vec = self.vectorizer.transform([question])
-                scores = [cosine_similarity(question_vec, vec) for vec in context_vec]
+                scores = [cosine_similarity(question_vec, vec).flatten() for vec in context_vec]
+                scores = np.asarray(scores).flatten()
 
                 print(question, '\n', sentences)
-                print("Scores : ", scores)
-                ranks = np.argsort(scores)
+                # print("Scores : ", scores)
+                ranks = np.argsort(scores)[::-1]
                 print("Ranks : ", ranks)
                 if scores[ranks[0]] > thresh:
                     # We have an answer for this question in this context paragraph
