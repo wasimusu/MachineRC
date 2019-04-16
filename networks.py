@@ -29,11 +29,11 @@ class Encoder(nn.Module):
         self.hidden = self.init_hidden()
         self.sentinel = nn.Parameter(torch.rand(hidden_size, ))
 
-    def forward(self, input, mask):
+    def forward(self, inputs, mask):
         lengths = torch.sum(mask, 1)
 
-        input = self.embeddings(input)  # Convert the numbers into embeddings
-        packed = pack_padded_sequence(input, lengths, batch_first=True)
+        inputs = self.embeddings(inputs)  # Convert the numbers into embeddings
+        packed = pack_padded_sequence(inputs, lengths, batch_first=True)
         output, self.hidden = self.encoder(packed, self.hidden)
         output, _ = pad_packed_sequence(output, batch_first=True)
 
@@ -70,94 +70,6 @@ class FusionBiLSTM(nn.Module):
 
     def init_hidden(self):
         return torch.zeros(self.num_directions * self.num_layers, self.batch_size, self.hidden_size)
-
-
-class CoattentionNetwork(nn.Module):
-    def __init__(self, hidden_size, num_layers, batch_size, bidrectional=True):
-        super(CoattentionNetwork, self).__init__()
-
-        self.batch_size = batch_size
-        self.num_directions = 2 if bidrectional else 1
-        self.num_layers = num_layers
-
-        self.fusion_bilstm = FusionBiLSTM(hidden_size=hidden_size)
-        self.encoder = Encoder(bidirectional=bidrectional, num_layers=num_layers, batch_size=batch_size)
-        self.decoder = DynamicDecoder(hidden_size=hidden_size, batch_size=batch_size, num_layers=num_layers,
-                                      bidirectional=bidrectional)
-        self.fc_question = nn.Linear(hidden_size, hidden_size)  # l * ( n + 1)
-
-    def forward(self, q_seq, q_mask, d_seq, d_mask, target_span=None):
-        # Variable names match the paper except for D, Q, D_t, and Q_t
-        # which are the transposes of the paper's D, Q, D_t and Q_t
-
-        D = self.encoder(d_seq, d_mask)
-        Q = self.encoder(q_seq, q_mask) # Named Q prime in paper
-        Q = torch.tanh(self.fc_question(Q))  # This is for questions only
-
-        D_t = torch.transpose(D, 1, 2) # Transpose each matrix in D batch
-        L = torch.bmm(Q, D_t) # Affinity matrix
-
-        A_Q = F.softmax(L, 1)  # row-wise normalization to get attention weights each word in question
-        A_D = F.softmax(L, 2)  # column-wise softmax to get attention weights for document
-        C_Q = D.bmm(D_t, A_Q)  # C_Q : B x l x (n + 1)
-
-        Q_t = torch.transpose(Q, 1, 2) # Transpose each matrix in Q batch
-        C_D = torch.cat((Q_t, C_Q), dim=1).bmm(A_D)  # C_D : 2l * (m + 1)
-        C_D_t = C_D.transpose(1, 2)
-
-        bilstm_in = torch.cat((C_D_t, D), dim=2)
-        # TODO : Different than the other implementation of coattention
-        U = self.fusion_bilstm(bilstm_in, self.hidden)  # U : 2l x m
-
-        loss, index_start, index_end = self.decoder(U, d_mask, target_span)
-        return loss, index_start, index_end
-
-    def initHidden(self):
-        return torch.zeros(self.num_directions * self.num_layers, self.batch_size, self.hidden_size)
-
-
-# TODO : seems okay (for now) but risky to test
-class HMN(nn.Module):
-    def __init__(self, hidden_size):
-        super(HMN, self).__init__()
-        self.hidden_size = hidden_size
-
-        # The four dense / fc layers of HMN
-        self.r = nn.Linear(hidden_size * 5, hidden_size)
-        self.m_t_1 = nn.Linear(hidden_size * 3, hidden_size)
-        self.m_t_2 = nn.Linear(hidden_size, hidden_size)
-        self.final_fc = nn.Linear(hidden_size * 2, hidden_size)  # Output dim could be 1
-
-        self.loss = nn.CrossEntropyLoss()
-
-    def forward(self, H, U, U_CAT, target=None):
-        """
-        :param H: hidden state of decoder : h
-        :param U: Result of bi-lstm fusion : 2h
-        :param U_CAT : concatentation of U corresponding to ith start and end position
-        :param target:  ground truth / expected start and end positions : 1 pair for each item in batch
-        :return:
-        """
-        r = torch.tanh(self.r(torch.cat((H, U_CAT))).unsqueeze(0))  # r : 1 * l
-
-        M_1, _ = torch.max(self.m_t_1(torch.cat((U, r), dim=1)), dim=1)
-        M_1 = M_1.unsqueeze(0)  # M_1 : 1 * l
-
-        M_2, _ = torch.max(self.m_t_2(M_1), dim=1)
-        M_2 = M_2.unsqueeze(0)  # M_2 : 1 * l
-
-        score, _ = torch.max(self.fc3(torch.cat((M_1, M_2), dim=1)), dim=1)
-        score = score.unsqueeze(0)
-        score = F.softmax(score, dim=1)
-
-        _, index = torch.max(score, dim=1)
-
-        step_loss = None
-        if target:
-            step_loss = self.loss(index, target)
-
-        return index, step_loss
-
 
 class DynamicDecoder(nn.Module):
     """Predicts start and end given embedding and computes loss"""
@@ -244,3 +156,92 @@ class DynamicDecoder(nn.Module):
 
     # def initHidden(self):
     #     return torch.zeros(self.num_directions * self.num_layers, self.batch_size, self.hidden_size)
+
+
+class CoattentionNetwork(nn.Module):
+    def __init__(self, device, hidden_size, num_layers, batch_size, embeddings, max_dec_steps, bidrectional=False):
+        super(CoattentionNetwork, self).__init__()
+
+        self.batch_size = batch_size
+        self.num_directions = 2 if bidrectional else 1
+        self.num_layers = num_layers
+
+        self.fusion_bilstm = FusionBiLSTM(hidden_size=hidden_size)
+        self.encoder = Encoder(embeddings=embeddings, bidirectional=bidrectional,
+                        num_layers=num_layers, batch_size=batch_size)
+        self.decoder = DynamicDecoder(device=device, hidden_size=hidden_size, batch_size=batch_size,
+                        max_dec_steps=max_dec_steps, num_layers=num_layers, bidirectional=bidrectional)
+        self.fc_question = nn.Linear(hidden_size, hidden_size)  # l * ( n + 1)
+
+    def forward(self, q_seq, q_mask, d_seq, d_mask, target_span=None):
+        # Variable names match the paper except for D, Q, D_t, and Q_t
+        # which are the transposes of the paper's D, Q, D_t and Q_t
+
+        D = self.encoder(d_seq, d_mask)
+        Q = self.encoder(q_seq, q_mask) # Named Q prime in paper
+        Q = torch.tanh(self.fc_question(Q))  # This is for questions only
+
+        D_t = torch.transpose(D, 1, 2) # Transpose each matrix in D batch
+        L = torch.bmm(Q, D_t) # Affinity matrix
+
+        A_Q = F.softmax(L, 1)  # row-wise normalization to get attention weights each word in question
+        A_D = F.softmax(L, 2)  # column-wise softmax to get attention weights for document
+        C_Q = D.bmm(D_t, A_Q)  # C_Q : B x l x (n + 1)
+
+        Q_t = torch.transpose(Q, 1, 2) # Transpose each matrix in Q batch
+        C_D = torch.cat((Q_t, C_Q), dim=1).bmm(A_D)  # C_D : 2l * (m + 1)
+        C_D_t = C_D.transpose(1, 2)
+
+        bilstm_in = torch.cat((C_D_t, D), dim=2)
+        # TODO : Different than the other implementation of coattention
+        U = self.fusion_bilstm(bilstm_in, self.hidden)  # U : 2l x m
+
+        loss, index_start, index_end = self.decoder(U, d_mask, target_span)
+        return loss, index_start, index_end
+
+    def initHidden(self):
+        return torch.zeros(self.num_directions * self.num_layers, self.batch_size, self.hidden_size)
+
+
+# TODO : seems okay (for now) but risky to test
+class HMN(nn.Module):
+    def __init__(self, hidden_size):
+        super(HMN, self).__init__()
+        self.hidden_size = hidden_size
+
+        # The four dense / fc layers of HMN
+        self.r = nn.Linear(hidden_size * 5, hidden_size)
+        self.m_t_1 = nn.Linear(hidden_size * 3, hidden_size)
+        self.m_t_2 = nn.Linear(hidden_size, hidden_size)
+        self.final_fc = nn.Linear(hidden_size * 2, hidden_size)  # Output dim could be 1
+
+        self.loss = nn.CrossEntropyLoss()
+
+    def forward(self, H, U, U_CAT, target=None):
+        """
+        :param H: hidden state of decoder : h
+        :param U: Result of bi-lstm fusion : 2h
+        :param U_CAT : concatentation of U corresponding to ith start and end position
+        :param target:  ground truth / expected start and end positions : 1 pair for each item in batch
+        :return:
+        """
+        r = torch.tanh(self.r(torch.cat((H, U_CAT))).unsqueeze(0))  # r : 1 * l
+
+        M_1, _ = torch.max(self.m_t_1(torch.cat((U, r), dim=1)), dim=1)
+        M_1 = M_1.unsqueeze(0)  # M_1 : 1 * l
+
+        M_2, _ = torch.max(self.m_t_2(M_1), dim=1)
+        M_2 = M_2.unsqueeze(0)  # M_2 : 1 * l
+
+        score, _ = torch.max(self.fc3(torch.cat((M_1, M_2), dim=1)), dim=1)
+        score = score.unsqueeze(0)
+        score = F.softmax(score, dim=1)
+
+        _, index = torch.max(score, dim=1)
+
+        step_loss = None
+        if target:
+            # TODO: Fix this
+            step_loss = self.loss(index, target)
+
+        return index, step_loss
