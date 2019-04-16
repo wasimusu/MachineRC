@@ -1,10 +1,40 @@
-""" Get all the text in the squad in single file"""
+import numpy as np
+import torch
+import config
 
-from squad import Squad
+config = config.Config()
 
-s = Squad(train=True, root="data", download=False)
-text = [context for context, qas in s]
-text = "\n".join(text)
 
-with open("squad-base", mode='w', encoding='utf8') as file:
-    file.write(text)
+def get_mask_from_seq_len(seq_mask):
+    seq_lens = np.sum(seq_mask, 1)
+    max_len = np.max(seq_lens)
+    indices = np.arange(0, max_len)
+    mask = (indices < np.expand_dims(seq_lens, 1)).astype(int)
+    return mask
+
+
+def get_data(batch, is_train=True):
+    qn_mask = get_mask_from_seq_len(batch.qn_mask)
+    qn_mask_var = torch.from_numpy(qn_mask).long()
+
+    context_mask = get_mask_from_seq_len(batch.context_mask)
+    context_mask_var = torch.from_numpy(context_mask).long()
+
+    qn_seq_var = torch.from_numpy(batch.qn_ids).long()
+    context_seq_var = torch.from_numpy(batch.context_ids).long()
+
+    if config.mode == "train":
+        span_var = torch.from_numpy(batch.ans_span).long()
+
+    if is_train:
+        qn_mask_var = qn_mask_var.cuda()
+        context_mask_var = context_mask_var.cuda()
+        qn_seq_var = qn_seq_var.cuda()
+        context_seq_var = context_seq_var.cuda()
+        if is_train:
+            span_var = span_var.cuda()
+
+    if config.mode == "train":
+        return qn_seq_var, qn_mask_var, context_seq_var, context_mask_var, span_var
+    else:
+        return qn_seq_var, qn_mask_var, context_seq_var, context_mask_var

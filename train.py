@@ -4,27 +4,53 @@ Train the Coattention Network for Query Answering
 import os
 
 import torch
-import torch.nn as nn
 import torch.optim as optim
 
 import squad
 import networks as N
-
+from data_util.vocab import get_glove
+from data_util.data_batcher import get_batch_generator
+from data_util.evaluate import exact_match_score, f1_score
 from config import Config
+from data_utils import get_data
 
 config = Config()
 
+# Embeddings and word2id and id2word
+glove_path = os.path.join(config.vectors_cache, "glove.6B.{}d.txt".format(config.embedding_dim))
+emb_matrix, word2index, index2word = get_glove(glove_path, config.embedding_dim)
 
-def accuracy(data_iterator, model):
-    """ Find the accuracy of model on given set of data """
-    with torch.no_grad():
-        pass
+train_context_path = os.path.join(config.data_dir, "train.context")
+train_qn_path = os.path.join(config.data_dir, "train.question")
+train_ans_path = os.path.join(config.data_dir, "train.span")
+dev_context_path = os.path.join(config.data_dir, "dev.context")
+dev_qn_path = os.path.join(config.data_dir, "dev.question")
+dev_ans_path = os.path.join(config.data_dir, "dev.span")
 
 
-def step():
+def step(model, optimizer, batch):
     """
     One batch of training
-    :return: output, loss
+    :return: loss
+    """
+    # Here goes one batch of training
+    q_seq, q_mask, d_seq, d_mask, target_span = get_data(batch, config.mode.lower() == 'train')
+    print("q_seq : ", q_seq)
+    print("q_mask : ", q_mask)
+    print("d_seq : ", d_seq)
+    print("target span : ", target_span)
+
+    model.zero_grad()
+    loss, _, _ = model(q_seq, q_mask, d_seq, d_mask, target_span)
+    loss.backwards()
+    optimizer.step()
+    return loss
+
+
+def evaluate():
+    """
+    Evaluate the training and test set accuracy
+    :return:
     """
     pass
 
@@ -33,40 +59,45 @@ def train(*args, **kwargs):
     """ Train the network """
 
     model = N.CoattentionNetwork(device=config.device,
-                                hidden_size=config.hidden_size,
-                                emb_matrix=emb_matrix,
-                                num_encoder_layers=config.num_encoder_layers,
-                                num_fusion_bilstm_layers=config.num_fusion_bilstm_layers,
-                                num_decoder_layers=config.num_decoder_layers,
-                                batch_size=config.batch_size,
-                                max_dec_steps=config.max_dec_steps,
-                                fusion_dropout_rate=config.fusion_dropout_rate,
-                                encoder_bidirectional=config.encoder_bidirectional,
-                                decoder_bidirectional=config.decoder_bidirectional)
+                    hidden_size=config.hidden_size,
+                    emb_matrix=emb_matrix,
+                    num_encoder_layers=config.num_encoder_layers,
+                    num_fusion_bilstm_layers=config.num_fusion_bilstm_layers,
+                    num_decoder_layers=config.num_decoder_layers,
+                    batch_size=config.batch_size,
+                    max_dec_steps=config.max_dec_steps,
+                    fusion_dropout_rate=config.fusion_dropout_rate,
+                    encoder_bidirectional=config.encoder_bidirectional,
+                    decoder_bidirectional=config.decoder_bidirectional)
+
     optimizer = optim.SGD(model.parameters(), lr=config.learning_rate)
-    criterion = nn.MSELoss()
+
+    checkpoint_name = "checkpoint-Embed{}-ep{}-iter{}".format(config.embedding_dim, 2, 1000)
 
     # If the network has saved model, restore it
-    if os.path.exists("checkpoint"):
-        state = torch.load("checkpoint")
+    if os.path.exists(checkpoint_name):
+        state = torch.load(checkpoint_name)
         model.load_state_dict(state['model'])
         optimizer.load_state_dict(state['optimizer'])
+        start_epoch = state['epoch']
+        i = state['iter']
+        current_loss = state['loss']
+        print("Model restored from ", checkpoint_name)
+        print("Epoch : {}\tIter {}\t\tloss : {}".format(start_epoch, i, current_loss))
+    else:
+        print("Training with fresh parameters")
 
-    data_iterator = []  # data iterator for squad
-    for epoch in config.num_epochs:
-        for i, data in enumerate(data_iterator):
+    for epoch in range(config.num_epochs):
+        for i, batch in enumerate(get_batch_generator(word2index, train_context_path,
+                                                      train_qn_path, train_ans_path,
+                                                      config.batch_size, config.context_len,
+                                                      config.question_len, discard_long=True)):
 
-            # Here goes one batch of training
-            q_seq, q_mask, d_seq, d_mask, target_span = data
-            model.zero_grad()
-            output = model(q_seq, q_mask, d_seq, d_mask, target_span)
-            loss = criterion(target_span, output)
-            loss.backwards()
-            optimizer.step()
+            loss = step(model, optimizer, batch)
 
             # Displaying results
             if config.print_every:
-                print("Epoch : {}\tIter {}\t\tloss : {}".format(epoch, i, loss))
+                print("Epoch : {}\tIter {}\t\tloss : {}".format(epoch, 1, loss))
                 with torch.no_grad():
                     pass
                 # Maybe you want to do random evaluations as well for sanity check
@@ -80,8 +111,9 @@ def train(*args, **kwargs):
                     'optimizer': optimizer.state_dict(),
                     'current_loss': loss
                 }
-                checkpoint_name = "checkpoint-Em{}-ep{}-it-{}".format(config.embedding_dim, epoch, i)
+                checkpoint_name = "checkpoint-Embed{}-ep{}-iter{}".format(config.embedding_dim, epoch, i)
                 torch.save(state, checkpoint_name)
+
 
 if __name__ == '__main__':
     train()

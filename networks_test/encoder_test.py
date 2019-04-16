@@ -53,7 +53,7 @@ class Encoder_(nn.Module):
 
         self.embedding = nn.Embedding(10, hidden_dim)
         # self.embedding = get_pretrained_embedding(emb_matrix)
-        self.emb_dim = self.embedding.embedding_dim
+        self.emb_dim = self.embedding.embedding_size
 
         self.encoder = nn.LSTM(self.emb_dim, hidden_dim, 1, batch_first=True,
                                bidirectional=False, dropout=dropout_ratio)
