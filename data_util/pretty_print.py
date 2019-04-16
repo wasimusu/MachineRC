@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""This file contains functions to pretty-print a SQuAD example"""
+"""This file contains functions to pretty-print(a SQuAD example"""
 
 from colorama import Fore, Back, Style
 from data_util.vocab import _PAD
@@ -45,7 +45,7 @@ def magentaback(s):
 
 def print_example(word2id, context_tokens, qn_tokens, true_ans_start, true_ans_end, pred_ans_start, pred_ans_end, true_answer, pred_answer, f1, em):
     """
-    Pretty-print the results for one example.
+    Pretty-print(the results for one example.
 
     Inputs:
       word2id: dictionary mapping word (string) to word id (int)
@@ -96,4 +96,3 @@ def print_example(word2id, context_tokens, qn_tokens, true_ans_start, true_ans_e
     print(yellowtext("{:>20}: {}".format("PREDICTED ANSWER", pred_answer)))
     print(yellowtext("{:>20}: {:4.3f}".format("F1 SCORE ANSWER", f1)))
     print(yellowtext("{:>20}: {}".format("EM SCORE", em)))
-    print("")

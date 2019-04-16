@@ -20,7 +20,6 @@ from __future__ import division
 
 import random
 import re
-import time
 
 import numpy as np
 from six.moves import xrange
@@ -107,7 +106,6 @@ def refill_batches(batches, word2id, context_file, qn_file, ans_file, batch_size
         If False, truncate those exmaples instead.
     """
     print("Refilling batches...")
-    tic = time.time()
     examples = [] # list of (qn_ids, context_ids, ans_span, ans_tokens) triples
     context_line, qn_line, ans_line = context_file.readline(), qn_file.readline(), ans_file.readline() # read the next line from each
 
@@ -166,8 +164,6 @@ def refill_batches(batches, word2id, context_file, qn_file, ans_file, batch_size
     # shuffle the batches
     random.shuffle(batches)
 
-    toc = time.time()
-    print("Refilling batches took %.2f seconds" % (toc-tic))
     return
 
 
