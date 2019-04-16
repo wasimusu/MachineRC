@@ -44,12 +44,27 @@ class Encoder(nn.Module):
         # Get input lengths
         lens = torch.sum(mask, 1)
 
+         # Sort the sequence lengths
+        lens_sorted, lens_argsort = torch.sort(lens, dim=0, descending=True)
+
+        # Sorting the argsort sorts the original indices
+        # which of course is equivalent to putting the original indices
+        # in the original order, thus, argsort_argsort are the positions used
+        # to restore the sorted version back to the original.
+        _, lens_argsort_argsort = torch.sort(lens_argsort, dim=0)
+
         # Convert the numbers into embeddings
         inputs = self.embeddings(inputs.to('cpu'))
 
-        packed = pack_padded_sequence(inputs, lens, batch_first=True)
+        # Get the sorted version of inputs as required for pack_padded_sequence
+        inputs_sorted = torch.index_select(inputs, 0, lens_argsort)
+
+        packed = pack_padded_sequence(inputs_sorted, lens, batch_first=True)
         output, self.hidden = self.encoder(packed, self.hidden)
         output, _ = pad_packed_sequence(output, batch_first=True)
+
+        # Restore batch elements to original order
+        output = torch.index_select(output, 0, lens_argsort_argsort)
 
         # TODO: A sentinel vector should be added somehow
         return output
@@ -78,11 +93,31 @@ class FusionBiLSTM(nn.Module):
         self.dropout = nn.Dropout(p=dropout_rate)
 
     def forward(self, inputs, mask):
-        lens = torch.sum(mask, 1)  # Get input lengths
+        # Get input lengths
+        lens = torch.sum(mask, 1)
 
-        packed = pack_padded_sequence(inputs, lens, batch_first=True)
+        # Sort the sequence lengths
+        lens_sorted, lens_argsort = torch.sort(lens, dim=0, descending=True)
+
+        # Sorting the argsort sorts the original indices
+        # which of course is equivalent to putting the original indices
+        # in the original order, thus, argsort_argsort are the positions used
+        # to restore the sorted version back to the original.
+        _, lens_argsort_argsort = torch.sort(lens_argsort, dim=0)
+
+        # Get the sorted version of inputs as required for pack_padded_sequence
+        inputs_sorted = torch.index_select(inputs, 0, lens_argsort)
+
+        packed = pack_padded_sequence(inputs_sorted, lens_sorted, batch_first=True)
         output, self.hidden = self.fusion_bilstm(packed, self.hidden)
         output, _ = pad_packed_sequence(output, batch_first=True)
+
+        # Restore batch elements to original order
+        output = torch.index_select(output, 0, lens_argsort_argsort)
+
+        # Make output contiguous for speed of future operations
+        # TODO: Try without and time to see if this actually speeds up
+        output = output.contiguous()
 
         output = self.dropout(output)
         return output
