@@ -30,10 +30,10 @@ class Encoder(nn.Module):
         self.sentinel = nn.Parameter(torch.rand(hidden_size, ))
 
     def forward(self, inputs, mask):
-        lengths = torch.sum(mask, 1)
+        input_lengths = torch.sum(mask, 1)
 
         inputs = self.embeddings(inputs)  # Convert the numbers into embeddings
-        packed = pack_padded_sequence(inputs, lengths, batch_first=True)
+        packed = pack_padded_sequence(inputs, input_lengths, batch_first=True)
         output, self.hidden = self.encoder(packed, self.hidden)
         output, _ = pad_packed_sequence(output, batch_first=True)
 
@@ -46,7 +46,7 @@ class Encoder(nn.Module):
 
 # TODO : Takes input and produces out of same dimension our reference implementation
 class FusionBiLSTM(nn.Module):
-    def __init__(self, hidden_size=100, num_layers=1, batch_size=1, bidirectional=True):
+    def __init__(self, dropout_rate, hidden_size=100, num_layers=1, batch_size=1, bidirectional=True):
         super(FusionBiLSTM, self).__init__()
 
         self.bidirectional = bidirectional
@@ -58,14 +58,36 @@ class FusionBiLSTM(nn.Module):
         self.fusion_bilstm = nn.GRU(input_size=hidden_size * 3, hidden_size=hidden_size, batch_first=True,
                                     bidirectional=bidirectional)
         self.hidden = self.init_hidden()
+        self.dropout = nn.Dropout(p=dropout_rate)
 
-    def forward(self, input, mask):
-        lengths = torch.sum(mask, 1)
+    def forward(self, inputs, mask):
+        # Get input lengths
+        lens = torch.sum(mask, 1)
 
-        packed = pack_padded_sequence(input, lengths, batch_first=True)
+        # Sort the sequence lengths
+        lens_sorted, lens_argsort = torch.sort(lens, dim=0, descending=True)
+
+        # Sorting the argsort sorts the original indices
+        # which of course is equivalent to putting the original indices
+        # in the original order, thus, argsort_argsort are the positions used
+        # to restore the sorted version back to the original.
+        _, lens_argsort_argsort = torch.sort(lens_argsort, dim=0)
+
+        # Get the sorted version of seq as required for pack_padded_sequence
+        inputs_sorted = torch.index_select(inputs, 0, lens_argsort)
+
+        packed = pack_padded_sequence(inputs_sorted, lens_sorted, batch_first=True)
         output, self.hidden = self.fusion_bilstm(packed, self.hidden)
         output, _ = pad_packed_sequence(output, batch_first=True)
 
+        # Return batch elements to original order
+        output = torch.index_select(output, 0, lens_argsort_argsort)
+
+        # Make output contiguous for speed of future operations
+        # TODO: Try without and time to see if this actually speeds up
+        output = output.contiguous()
+
+        output = self.dropout(output)
         return output
 
     def init_hidden(self):
@@ -194,7 +216,7 @@ class CoattentionNetwork(nn.Module):
 
         bilstm_in = torch.cat((C_D_t, D), dim=2)
         # TODO : Different than the other implementation of coattention
-        U = self.fusion_bilstm(bilstm_in, self.hidden)  # U : 2l x m
+        U = self.fusion_bilstm(bilstm_in, d_mask)  # U : 2l x m
 
         loss, index_start, index_end = self.decoder(U, d_mask, target_span)
         return loss, index_start, index_end
@@ -225,6 +247,7 @@ class HMN(nn.Module):
         :param target:  ground truth / expected start and end positions : 1 pair for each item in batch
         :return:
         """
+        # TODO Change to cat along axis 1? - for batch
         r = torch.tanh(self.r(torch.cat((H, U_CAT))).unsqueeze(0))  # r : 1 * l
 
         M_1, _ = torch.max(self.m_t_1(torch.cat((U, r), dim=1)), dim=1)
