@@ -45,7 +45,7 @@ class Encoder(nn.Module):
         lens = torch.sum(mask, 1)
 
         # Convert the numbers into embeddings
-        inputs = self.embeddings(inputs)
+        inputs = self.embeddings(inputs.to('cpu'))
 
         packed = pack_padded_sequence(inputs, lens, batch_first=True)
         output, self.hidden = self.encoder(packed, self.hidden)

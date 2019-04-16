@@ -3,21 +3,22 @@ Contains all the knobs for the whole project
 """
 import torch
 
+
 class Config:
     def __init__(self):
         """Expirement configuration"""
 
-        self.mode = "train" # TODO: Why do we want this in config?
+        self.mode = "train"  # TODO: Why do we want this in config?
 
         # Device params
         self.use_cuda = torch.cuda.is_available()
         self.device = ('cuda' if self.use_cuda else 'cpu')
 
         # Global dimension params
-        self.embedding_dim = 100
+        self.embedding_dim = 50
         self.hidden_size = self.embedding_dim
-        self.context_len = 200 # TODO: Why do we need this?
-        self.question_len = 20 # TODO: Why do we need this?
+        self.context_len = 200  # TODO: Why do we need this?
+        self.question_len = 20  # TODO: Why do we need this?
 
         # Training params
         self.num_epochs = 10
@@ -45,4 +46,3 @@ class Config:
         # Logs
         self.print_every = 100
         self.save_every = 100
-
