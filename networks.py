@@ -64,7 +64,7 @@ class FusionBiLSTM(nn.Module):
         self.dropout = nn.Dropout(p=dropout_rate)
 
     def forward(self, inputs, mask):
-        lens = torch.sum(mask, 1) # Get input lengths
+        lens = torch.sum(mask, 1)  # Get input lengths
 
         packed = pack_padded_sequence(inputs, lens, batch_first=True)
         output, self.hidden = self.fusion_bilstm(packed, self.hidden)
@@ -76,11 +76,12 @@ class FusionBiLSTM(nn.Module):
     def init_hidden(self):
         return torch.zeros(self.num_directions * self.num_layers, self.batch_size, self.hidden_size)
 
+
 class DynamicDecoder(nn.Module):
     """Predicts start and end given embedding and computes loss"""
 
     def __init__(self, device, hidden_size, batch_size, max_dec_steps,
-                    num_layers=1, bidirectional=False):
+                 num_layers=1, bidirectional=False):
         super(DynamicDecoder, self).__init__()
 
         self.device = device
@@ -94,10 +95,10 @@ class DynamicDecoder(nn.Module):
         self.start_hmn = HMN(hidden_size)
         self.end_hmn = HMN(hidden_size)
         self.gru = nn.GRU(input_size=hidden_size * 2,
-                        hidden_size=hidden_size,
-                        batch_first=True,
-                        num_layers=num_layers,
-                        bidirectional=bidirectional)
+                          hidden_size=hidden_size,
+                          batch_first=True,
+                          num_layers=num_layers,
+                          bidirectional=bidirectional)
 
         # self.hidden = self.initHidden() # for GRU
 
@@ -121,18 +122,18 @@ class DynamicDecoder(nn.Module):
             s_target = target_span[:, 0]
             e_target = target_span[:, 1]
 
-        h_i = None # hidden state of GRU
+        h_i = None  # hidden state of GRU
         cumulative_loss = 0.
         loss = None
 
         # Initialize embedding at start estimate
-        u_s_i = U[batch_indices, s_i :] # batch_size x 2l
+        u_s_i = U[batch_indices, s_i:]  # batch_size x 2l
 
         # Iterate getting a start and end estimate every iteration
         for _ in range(self.max_dec_steps):
             # Update embedding at end estimate
-            u_e_i = U[batch_indices, e_i, :] # batch_size x 2l
-            u_cat = torch.cat((u_s_i, u_e_i), 1) # batch_size x 4l
+            u_e_i = U[batch_indices, e_i, :]  # batch_size x 2l
+            u_cat = torch.cat((u_s_i, u_e_i), 1)  # batch_size x 4l
 
             # Get hidden state
             h_i = self.gru(u_cat.unsqueeze(1), h_i)[1]
@@ -141,10 +142,10 @@ class DynamicDecoder(nn.Module):
             s_i, start_loss_i = self.start_hmn(h_i, U, s_i, u_cat, s_target)
 
             # Update embedding at start estimate
-            u_s_i = U[batch_indices, s_i :] # batch_size x 2l
+            u_s_i = U[batch_indices, s_i:]  # batch_size x 2l
 
             # Get new u_cat with updated embedding at start estimate
-            u_cat = torch.cat((u_s_i, u_e_i), 1) # batch_size x 4l
+            u_cat = torch.cat((u_s_i, u_e_i), 1)  # batch_size x 4l
 
             # Get new end estimate and end loss
             e_i, end_loss_i = self.end_hmn(h_i, U, e_i, u_cat, e_target)
@@ -165,13 +166,13 @@ class DynamicDecoder(nn.Module):
 
 class CoattentionNetwork(nn.Module):
     def __init__(self, device,
-                    hidden_size,
-                    num_layers,
-                    batch_size,
-                    embeddings,
-                    max_dec_steps,
-                    fusion_dropout_rate=0.,
-                    bidrectional=False):
+                 hidden_size,
+                 num_layers,
+                 batch_size,
+                 embeddings,
+                 max_dec_steps=2,
+                 fusion_dropout_rate=0.,
+                 bidrectional=False):
         super(CoattentionNetwork, self).__init__()
 
         self.batch_size = batch_size
@@ -179,11 +180,11 @@ class CoattentionNetwork(nn.Module):
         self.num_layers = num_layers
 
         self.fusion_bilstm = FusionBiLSTM(dropout_rate=fusion_dropout_rate,
-                        hidden_size=hidden_size)
+                                          hidden_size=hidden_size)
         self.encoder = Encoder(embeddings=embeddings, bidirectional=bidrectional,
-                        num_layers=num_layers, batch_size=batch_size)
+                               num_layers=num_layers, batch_size=batch_size)
         self.decoder = DynamicDecoder(device=device, hidden_size=hidden_size, batch_size=batch_size,
-                        max_dec_steps=max_dec_steps, num_layers=num_layers, bidirectional=bidrectional)
+                                      max_dec_steps=max_dec_steps, num_layers=num_layers, bidirectional=bidrectional)
         self.fc_question = nn.Linear(hidden_size, hidden_size)  # l * ( n + 1)
 
     def forward(self, q_seq, q_mask, d_seq, d_mask, target_span=None):
@@ -193,17 +194,17 @@ class CoattentionNetwork(nn.Module):
         which are the transposes of the paper's D, Q, D_t and Q_t"""
 
         D = self.encoder(d_seq, d_mask)
-        Q = self.encoder(q_seq, q_mask) # Named Q prime in paper
+        Q = self.encoder(q_seq, q_mask)  # Named Q prime in paper
         Q = torch.tanh(self.fc_question(Q))  # This is for questions only
 
-        D_t = torch.transpose(D, 1, 2) # Transpose each matrix in D batch
-        L = torch.bmm(Q, D_t) # Affinity matrix
+        D_t = torch.transpose(D, 1, 2)  # Transpose each matrix in D batch
+        L = torch.bmm(Q, D_t)  # Affinity matrix
 
         A_Q = F.softmax(L, 1)  # row-wise normalization to get attention weights each word in question
         A_D = F.softmax(L, 2)  # column-wise softmax to get attention weights for document
         C_Q = D.bmm(D_t, A_Q)  # C_Q : B x l x (n + 1)
 
-        Q_t = torch.transpose(Q, 1, 2) # Transpose each matrix in Q batch
+        Q_t = torch.transpose(Q, 1, 2)  # Transpose each matrix in Q batch
         C_D = torch.cat((Q_t, C_Q), dim=1).bmm(A_D)  # C_D : 2l * (m + 1)
         C_D_t = C_D.transpose(1, 2)
 

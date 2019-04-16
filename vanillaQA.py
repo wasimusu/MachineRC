@@ -10,7 +10,7 @@ class ContextEncoder(nn.Module):
     Determine representation / encoding of Context
     """
 
-    def __init__(self, embedding_dim, hidden_dim, bidirectional=False, num_layers=1, batch_size=1, vocab_size=1000):
+    def __init__(self, embedding_size, hidden_dim, bidirectional=False, num_layers=1, batch_size=1, vocab_size=1000):
         super(ContextEncoder, self).__init__()
 
         self.bidirectional = bidirectional
@@ -19,9 +19,9 @@ class ContextEncoder(nn.Module):
         self.hidden_dim = hidden_dim
         self.batch_size = batch_size
 
-        self.embedding = nn.Embedding(vocab_size, embedding_dim)
+        self.embedding = nn.Embedding(vocab_size, embedding_size)
 
-        self.lstm = nn.LSTM(embedding_dim, hidden_dim)
+        self.lstm = nn.LSTM(embedding_size, hidden_dim)
         self.softmax = nn.Softmax(dim=1)
         self.hidden = self._init_hidden()
 
@@ -42,7 +42,7 @@ class QuestionEncoder(nn.Module):
     Determine representation of Question
     """
 
-    def __init__(self, embedding_dim, hidden_dim, bidirectional=False, num_layers=1, batch_size=1, vocab_size=1000):
+    def __init__(self, embedding_size, hidden_dim, bidirectional=False, num_layers=1, batch_size=1, vocab_size=1000):
         super(QuestionEncoder, self).__init__()
 
         self.bidirectional = bidirectional
@@ -51,9 +51,9 @@ class QuestionEncoder(nn.Module):
         self.hidden_dim = hidden_dim
         self.batch_size = batch_size
 
-        self.embedding = nn.Embedding(vocab_size, embedding_dim)
+        self.embedding = nn.Embedding(vocab_size, embedding_size)
 
-        self.lstm = nn.LSTM(embedding_dim, hidden_dim)
+        self.lstm = nn.LSTM(embedding_size, hidden_dim)
         self.softmax = nn.Softmax(dim=1)
         self.hidden = self._init_hidden()
 
@@ -91,7 +91,7 @@ class Decoder(nn.Module):
 
 # Architecture Details
 hidden_dim = 300
-embedding_dim = 300
+embedding_size = 300
 num_layers = 1
 bidirectional = False
 
@@ -104,8 +104,8 @@ learning_rate = 0.001
 
 device = ('cuda' if torch.cuda.is_available() else 'cpu')
 
-question_encoder = QuestionEncoder(embedding_dim, hidden_dim, bidirectional, num_layers, batch_size, vocab_size)
-context_encoder = ContextEncoder(embedding_dim, hidden_dim, bidirectional, num_layers, batch_size, vocab_size)
+question_encoder = QuestionEncoder(embedding_size, hidden_dim, bidirectional, num_layers, batch_size, vocab_size)
+context_encoder = ContextEncoder(embedding_size, hidden_dim, bidirectional, num_layers, batch_size, vocab_size)
 decoder = Decoder(decoder_feature_size, decoder_output_size)
 
 criterion = nn.MSELoss()
