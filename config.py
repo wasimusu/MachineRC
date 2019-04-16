@@ -40,7 +40,7 @@ class Config:
         # Directories
         self.data_dir = "data/"
         self.vectors_cache = "data/vectors_cache"
-        self.model_dir = "model/"
+        self.experiments_root_dir = "experiments/"
 
         # Logs
         self.print_every = 100

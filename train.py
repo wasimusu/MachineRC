@@ -2,6 +2,8 @@
 Train the Coattention Network for Query Answering
 """
 import os
+import time
+import json
 
 import torch
 import torch.optim as optim
@@ -70,7 +72,23 @@ def train(*args, **kwargs):
                     encoder_bidirectional=config.encoder_bidirectional,
                     decoder_bidirectional=config.decoder_bidirectional)
 
-    optimizer = optim.SGD(model.parameters(), lr=config.learning_rate)
+    optimizer = optim.Adam(model.parameters(), lr=config.learning_rate)
+
+    # Set up directories for this experiment
+    experiment_dir = os.path.join(config.experiments_root_dir,
+                    'experiment_%d' % (int(time.time())))
+    if not os.path.exists(experiment_dir):
+        os.mkdir(experiment_dir)
+    model_dir = os.path.join(experiment_dir, 'model')
+    if not os.path.exists(model_dir):
+        os.mkdir(model_dir)
+    bestmodel_dir = os.path.join(experiment_dir, 'bestmodel')
+    if not os.path.exists(bestmodel_dir):
+        os.makedirs(bestmodel_dir)
+
+    # Save config as config.json
+    with open(os.path.join(experiment_dir, "config.json"), 'w') as fout:
+        json.dump(vars(config), fout)
 
     checkpoint_name = "checkpoint-Embed{}-ep{}-iter{}".format(config.embedding_dim, 2, 1000)
 
@@ -87,12 +105,14 @@ def train(*args, **kwargs):
     else:
         print("Training with fresh parameters")
 
+    # For each epoch
     for epoch in range(config.num_epochs):
+        # For each batch
         for i, batch in enumerate(get_batch_generator(word2index, train_context_path,
                                                       train_qn_path, train_ans_path,
                                                       config.batch_size, config.context_len,
                                                       config.question_len, discard_long=True)):
-
+            # Take step in training
             loss = step(model, optimizer, batch)
 
             # Displaying results
@@ -112,7 +132,7 @@ def train(*args, **kwargs):
                     'current_loss': loss
                 }
                 checkpoint_name = "checkpoint-Embed{}-ep{}-iter{}".format(config.embedding_dim, epoch, i)
-                torch.save(state, checkpoint_name)
+                torch.save(state, os.path.join(model_dir, checkpoint_name))
 
 
 if __name__ == '__main__':
