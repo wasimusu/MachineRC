@@ -107,6 +107,8 @@ if __name__ == '__main__':
         context, qas = data
         print(i, "QA pairs : ", len(qas))
 
+
+
 # vocab = vocab.Vocab(osp.words, 2000, 3, specials=['<eos>', '<sos>', '<pad>'], vectors="glove.6B.100d",
 #                     vectors_cache='../.vector_cache')
 # print(vocab.vectors[4])

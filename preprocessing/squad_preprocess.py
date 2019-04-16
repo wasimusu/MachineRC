@@ -25,7 +25,7 @@ import numpy as np
 from tqdm import tqdm
 from six.moves.urllib.request import urlretrieve
 
-importlib.reload(sys)
+# importlib.reload(sys)
 random.seed(42)
 np.random.seed(42)
 
