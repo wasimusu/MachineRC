@@ -15,6 +15,7 @@ from data_util.data_batcher import get_batch_generator
 from data_util.evaluate import exact_match_score, f1_score
 from config import Config
 from data_utils import get_data
+from data_utils import timeit
 
 config = Config()
 
@@ -30,6 +31,7 @@ dev_qn_path = os.path.join(config.data_dir, "dev.question")
 dev_ans_path = os.path.join(config.data_dir, "dev.span")
 
 
+@timeit
 def step(model, optimizer, batch):
     """
     One batch of training
@@ -116,9 +118,7 @@ def train(*args, **kwargs):
 
             # Displaying results
             if config.print_every:
-                print("Epoch : {}\tIter {}\t\tloss : {}".format(epoch, 1, loss))
-                with torch.no_grad():
-                    pass
+                print("Epoch : {}\tIter {}\t\tloss : {}".format(epoch, i, "%.2f" % loss))
                 # Maybe you want to do random evaluations as well for sanity check
 
             # Saving the model

@@ -109,14 +109,14 @@ class FusionBiLSTM(nn.Module):
         _, lens_argsort_argsort = torch.sort(lens_argsort, dim=0)
 
         # Get the sorted version of inputs as required for pack_padded_sequence
-        inputs_sorted = torch.index_select(inputs, 0, lens_argsort)
+        inputs_sorted = torch.index_select(inputs, 0, lens_argsort.to('cpu'))
 
         packed = pack_padded_sequence(inputs_sorted, lens_sorted, batch_first=True)
         output, self.hidden = self.fusion_bilstm(packed, self.hidden)
         output, _ = pad_packed_sequence(output, batch_first=True)
 
         # Restore batch elements to original order
-        output = torch.index_select(output, 0, lens_argsort_argsort)
+        output = torch.index_select(output, 0, lens_argsort_argsort.to('cpu'))
 
         # Make output contiguous for speed of future operations
         # TODO: Try without and time to see if this actually speeds up
@@ -416,7 +416,7 @@ class MaxOutHighway(nn.Module):
         step_loss = None
 
         if target is not None:
-            step_loss = self.loss(alpha, target)
+            step_loss = self.loss(alpha, target.to('cpu'))
             step_loss = step_loss * curr_mask.float()
 
         return idx_i, curr_mask, step_loss

@@ -11,13 +11,13 @@ class Config:
         self.mode = "train"  # TODO: Why do we want this in config?
 
         # Device params
-        # self.use_cuda = torch.cuda.is_available()
-        # self.device = ('cuda' if self.use_cuda else 'cpu')
-        self.device = 'cpu'
-        self.use_cuda = False
+        self.use_cuda = torch.cuda.is_available()
+        self.device = ('cuda' if self.use_cuda else 'cpu')
+        # self.device = 'cpu'
+        # self.use_cuda = False
 
         # Global dimension params
-        self.embedding_dim = 50
+        self.embedding_dim = 100
         self.hidden_size = self.embedding_dim
         self.context_len = 200  # TODO: Why do we need this?
         self.question_len = 20  # TODO: Why do we need this?
