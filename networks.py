@@ -33,27 +33,12 @@ class Encoder(nn.Module):
         # Get input lengths
         lens = torch.sum(mask, 1)
 
-        # Sort the sequence lengths
-        lens_sorted, lens_argsort = torch.sort(lens, dim=0, descending=True)
-
-        # Sorting the argsort sorts the original indices
-        # which of course is equivalent to putting the original indices
-        # in the original order, thus, argsort_argsort are the positions used
-        # to restore the sorted version back to the original.
-        _, lens_argsort_argsort = torch.sort(lens_argsort, dim=0)
-
         # Convert the numbers into embeddings
         inputs = self.embeddings(inputs)
 
-        # Get the sorted version of inputs as required for pack_padded_sequence
-        inputs_sorted = torch.index_select(inputs, 0, lens_argsort)
-
-        packed = pack_padded_sequence(inputs_sorted, lens_sorted, batch_first=True)
+        packed = pack_padded_sequence(inputs, lens, batch_first=True)
         output, self.hidden = self.encoder(packed, self.hidden)
         output, _ = pad_packed_sequence(output, batch_first=True)
-
-        # Restore batch elements to original order
-        output = torch.index_select(output, 0, lens_argsort_argsort)
 
         # TODO: A sentinel vector should be added somehow
         return output
@@ -79,31 +64,11 @@ class FusionBiLSTM(nn.Module):
         self.dropout = nn.Dropout(p=dropout_rate)
 
     def forward(self, inputs, mask):
-        # Get input lengths
-        lens = torch.sum(mask, 1)
+        lens = torch.sum(mask, 1) # Get input lengths
 
-        # Sort the sequence lengths
-        lens_sorted, lens_argsort = torch.sort(lens, dim=0, descending=True)
-
-        # Sorting the argsort sorts the original indices
-        # which of course is equivalent to putting the original indices
-        # in the original order, thus, argsort_argsort are the positions used
-        # to restore the sorted version back to the original.
-        _, lens_argsort_argsort = torch.sort(lens_argsort, dim=0)
-
-        # Get the sorted version of inputs as required for pack_padded_sequence
-        inputs_sorted = torch.index_select(inputs, 0, lens_argsort)
-
-        packed = pack_padded_sequence(inputs_sorted, lens_sorted, batch_first=True)
+        packed = pack_padded_sequence(inputs, lens, batch_first=True)
         output, self.hidden = self.fusion_bilstm(packed, self.hidden)
         output, _ = pad_packed_sequence(output, batch_first=True)
-
-        # Restore batch elements to original order
-        output = torch.index_select(output, 0, lens_argsort_argsort)
-
-        # Make output contiguous for speed of future operations
-        # TODO: Try without and time to see if this actually speeds up
-        output = output.contiguous()
 
         output = self.dropout(output)
         return output
@@ -199,14 +164,22 @@ class DynamicDecoder(nn.Module):
 
 
 class CoattentionNetwork(nn.Module):
-    def __init__(self, device, hidden_size, num_layers, batch_size, embeddings, max_dec_steps, bidrectional=False):
+    def __init__(self, device,
+                    hidden_size,
+                    num_layers,
+                    batch_size,
+                    embeddings,
+                    max_dec_steps,
+                    fusion_dropout_rate=0.,
+                    bidrectional=False):
         super(CoattentionNetwork, self).__init__()
 
         self.batch_size = batch_size
         self.num_directions = 2 if bidrectional else 1
         self.num_layers = num_layers
 
-        self.fusion_bilstm = FusionBiLSTM(hidden_size=hidden_size)
+        self.fusion_bilstm = FusionBiLSTM(dropout_rate=fusion_dropout_rate,
+                        hidden_size=hidden_size)
         self.encoder = Encoder(embeddings=embeddings, bidirectional=bidrectional,
                         num_layers=num_layers, batch_size=batch_size)
         self.decoder = DynamicDecoder(device=device, hidden_size=hidden_size, batch_size=batch_size,
@@ -214,8 +187,10 @@ class CoattentionNetwork(nn.Module):
         self.fc_question = nn.Linear(hidden_size, hidden_size)  # l * ( n + 1)
 
     def forward(self, q_seq, q_mask, d_seq, d_mask, target_span=None):
-        # Variable names match the paper except for D, Q, D_t, and Q_t
-        # which are the transposes of the paper's D, Q, D_t and Q_t
+        """Feedforward, backprop, and return loss and predictions
+
+        Variable names match the paper except for D, Q, D_t, and Q_t
+        which are the transposes of the paper's D, Q, D_t and Q_t"""
 
         D = self.encoder(d_seq, d_mask)
         Q = self.encoder(q_seq, q_mask) # Named Q prime in paper
