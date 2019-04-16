@@ -31,7 +31,7 @@ dev_ans_path = os.path.join(config.data_dir, "dev.span")
 def step(model, optimizer, batch):
     """
     One batch of training
-    :return: output, loss
+    :return: loss
     """
     # Here goes one batch of training
     q_seq, q_mask, d_seq, d_mask, target_span = get_data(batch, config.mode.lower() == 'train')
@@ -47,6 +47,14 @@ def step(model, optimizer, batch):
     return loss
 
 
+def evaluate():
+    """
+    Evaluate the training and test set accuracy
+    :return:
+    """
+    pass
+
+
 def train(*args, **kwargs):
     """ Train the network """
 
@@ -54,17 +62,26 @@ def train(*args, **kwargs):
                                  embeddings, bidrectional=False)
     optimizer = optim.SGD(model.parameters(), lr=config.learning_rate)
 
+    checkpoint_name = "checkpoint-Embed{}-ep{}-iter".format(config.embedding_size, 2, 1000)
+
     # If the network has saved model, restore it
-    if os.path.exists("checkpoint"):
-        state = torch.load("checkpoint")
+    if os.path.exists(checkpoint_name):
+        state = torch.load(checkpoint_name)
         model.load_state_dict(state['model'])
         optimizer.load_state_dict(state['optimizer'])
+        start_epoch = state['epoch']
+        i = state['iter']
+        current_loss = state['loss']
+        print("Model restored from ", checkpoint_name)
+        print("Epoch : {}\tIter {}\t\tloss : {}".format(start_epoch, i, current_loss))
+    else:
+        print("Training with fresh parameters")
 
     for epoch in range(config.num_epochs):
-        for batch in get_batch_generator(word2index, train_context_path,
-                                         train_qn_path, train_ans_path,
-                                         config.batch_size, config.context_len,
-                                         config.question_len, discard_long=True):
+        for i, batch in enumerate(get_batch_generator(word2index, train_context_path,
+                                                      train_qn_path, train_ans_path,
+                                                      config.batch_size, config.context_len,
+                                                      config.question_len, discard_long=True)):
 
             loss = step(model, optimizer, batch)
 
@@ -78,13 +95,13 @@ def train(*args, **kwargs):
             # Saving the model
             if config.save_every:
                 state = {
-                    'iter': 1,
+                    'iter': i,
                     'epoch': epoch,
                     'model': model.state_dict(),
                     'optimizer': optimizer.state_dict(),
                     'current_loss': loss
                 }
-                checkpoint_name = "checkpoint-Em{}-ep{}-it-{}".format(config.embedding_size, epoch, 1)
+                checkpoint_name = "checkpoint-Embed{}-ep{}-iter{}".format(config.embedding_size, epoch, i)
                 torch.save(state, checkpoint_name)
 
 
