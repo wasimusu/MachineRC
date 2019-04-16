@@ -11,8 +11,10 @@ class Config:
         self.mode = "train"  # TODO: Why do we want this in config?
 
         # Device params
-        self.use_cuda = torch.cuda.is_available()
-        self.device = ('cuda' if self.use_cuda else 'cpu')
+        # self.use_cuda = torch.cuda.is_available()
+        # self.device = ('cuda' if self.use_cuda else 'cpu')
+        self.device = 'cpu'
+        self.use_cuda = False
 
         # Global dimension params
         self.embedding_dim = 50
@@ -22,8 +24,8 @@ class Config:
 
         # Training params
         self.num_epochs = 10
-        self.learning_rate = 0.01
-        self.batch_size = 100
+        self.learning_rate = 0.001
+        self.batch_size = 16
         self.l2_norm = 0.1
 
         # Encoder params
@@ -35,8 +37,11 @@ class Config:
 
         # Decoder params
         self.max_dec_steps = 6
-        self.num_decoder_layers = 2
+        self.num_decoder_layers = 1
         self.decoder_bidirectional = False
+
+        # HMN params
+        self.max_pool_size = 16
 
         # Directories
         self.data_dir = "data/"
@@ -45,4 +50,4 @@ class Config:
 
         # Logs
         self.print_every = 100
-        self.save_every = 100
+        self.save_every = 1000

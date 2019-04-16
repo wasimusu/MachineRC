@@ -27,12 +27,12 @@ def get_data(batch, is_train=True):
         span_var = torch.from_numpy(batch.ans_span).long()
 
     if is_train:
-        qn_mask_var = qn_mask_var.cuda()
-        context_mask_var = context_mask_var.cuda()
-        qn_seq_var = qn_seq_var.cuda()
-        context_seq_var = context_seq_var.cuda()
+        qn_mask_var = qn_mask_var.to(config.device)
+        context_mask_var = context_mask_var.to(config.device)
+        qn_seq_var = qn_seq_var.to(config.device)
+        context_seq_var = context_seq_var.to(config.device)
         if is_train:
-            span_var = span_var.cuda()
+            span_var = span_var.to(config.device)
 
     if config.mode == "train":
         return qn_seq_var, qn_mask_var, context_seq_var, context_mask_var, span_var

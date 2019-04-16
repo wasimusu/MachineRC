@@ -37,14 +37,11 @@ def step(model, optimizer, batch):
     """
     # Here goes one batch of training
     q_seq, q_mask, d_seq, d_mask, target_span = get_data(batch, config.mode.lower() == 'train')
-    print("q_seq : ", q_seq)
-    print("q_mask : ", q_mask)
-    print("d_seq : ", d_seq)
-    print("target span : ", target_span)
-
     model.zero_grad()
+    # The loss is individual loss for each pair of question, context and answer
     loss, _, _ = model(q_seq, q_mask, d_seq, d_mask, target_span)
-    loss.backwards()
+    loss = torch.sum(loss)
+    loss.backward(retain_graph=True)
     optimizer.step()
     return loss
 
@@ -61,27 +58,29 @@ def train(*args, **kwargs):
     """ Train the network """
 
     model = N.CoattentionNetwork(device=config.device,
-                    hidden_size=config.hidden_size,
-                    emb_matrix=emb_matrix,
-                    num_encoder_layers=config.num_encoder_layers,
-                    num_fusion_bilstm_layers=config.num_fusion_bilstm_layers,
-                    num_decoder_layers=config.num_decoder_layers,
-                    batch_size=config.batch_size,
-                    max_dec_steps=config.max_dec_steps,
-                    fusion_dropout_rate=config.fusion_dropout_rate,
-                    encoder_bidirectional=config.encoder_bidirectional,
-                    decoder_bidirectional=config.decoder_bidirectional)
+                                 hidden_size=config.hidden_size,
+                                 emb_matrix=emb_matrix,
+                                 num_encoder_layers=config.num_encoder_layers,
+                                 num_fusion_bilstm_layers=config.num_fusion_bilstm_layers,
+                                 num_decoder_layers=config.num_decoder_layers,
+                                 batch_size=config.batch_size,
+                                 max_dec_steps=config.max_dec_steps,
+                                 fusion_dropout_rate=config.fusion_dropout_rate,
+                                 encoder_bidirectional=config.encoder_bidirectional,
+                                 decoder_bidirectional=config.decoder_bidirectional)
 
-    optimizer = optim.Adam(model.parameters(), lr=config.learning_rate)
+    # Select the parameters which require grad / backpropagation
+    params = list(filter(lambda p: p.requires_grad, model.parameters()))
+    optimizer = optim.Adam(params, lr=config.learning_rate)
 
     # Set up directories for this experiment
     experiment_dir = os.path.join(config.experiments_root_dir,
-                    'experiment_%d' % (int(time.time())))
+                                  'experiment_%d' % (int(time.time())))
     if not os.path.exists(experiment_dir):
-        os.mkdir(experiment_dir)
+        os.makedirs(experiment_dir)
     model_dir = os.path.join(experiment_dir, 'model')
     if not os.path.exists(model_dir):
-        os.mkdir(model_dir)
+        os.makedirs(model_dir)
     bestmodel_dir = os.path.join(experiment_dir, 'bestmodel')
     if not os.path.exists(bestmodel_dir):
         os.makedirs(bestmodel_dir)
@@ -132,7 +131,8 @@ def train(*args, **kwargs):
                     'current_loss': loss
                 }
                 checkpoint_name = "checkpoint-Embed{}-ep{}-iter{}".format(config.embedding_dim, epoch, i)
-                torch.save(state, os.path.join(model_dir, checkpoint_name))
+                fname = os.path.join(model_dir, checkpoint_name)
+                torch.save(state, fname)
 
 
 if __name__ == '__main__':
