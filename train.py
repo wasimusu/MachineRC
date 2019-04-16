@@ -32,7 +32,17 @@ def step():
 def train(*args, **kwargs):
     """ Train the network """
 
-    model = N.CoattentionNetwork(config.hidden_size, num_layers=2, batch_size=1, bidrectional=False)
+    model = N.CoattentionNetwork(device=config.device,
+                                hidden_size=config.hidden_size,
+                                emb_matrix=emb_matrix,
+                                num_encoder_layers=config.num_encoder_layers,
+                                num_fusion_bilstm_layers=config.num_fusion_bilstm_layers,
+                                num_decoder_layers=config.num_decoder_layers,
+                                batch_size=config.batch_size,
+                                max_dec_steps=config.max_dec_steps,
+                                fusion_dropout_rate=config.fusion_dropout_rate,
+                                encoder_bidirectional=config.encoder_bidirectional,
+                                decoder_bidirectional=config.decoder_bidirectional)
     optimizer = optim.SGD(model.parameters(), lr=config.learning_rate)
     criterion = nn.MSELoss()
 

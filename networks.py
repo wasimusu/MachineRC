@@ -10,13 +10,24 @@ class Encoder(nn.Module):
     Generate encoding for both question and context
     """
 
-    def __init__(self, embeddings, hidden_size=300, batch_size=1, bidirectional=False, num_layers=1):
+    def get_pretrained_embedding(self, np_emb_matrix):
+        embeddings = nn.Embedding(*np_emb_matrix.shape)
+        embeddings.weight = nn.Parameter(torch.from_numpy(np_emb_matrix).float())
+        embeddings.weight.requires_grad = False
+        return embeddings
+
+    def __init__(self, emb_matrix,
+                batch_size,
+                hidden_size,
+                num_layers,
+                bidirectional=False):
+
         super(Encoder, self).__init__()
 
         # TODO : The bottom line is testing stuff
         # self.embeddings = nn.Embedding(10, hidden_size)     # Just put here to test things out
 
-        self.embeddings = embeddings
+        self.embeddings = self.get_pretrained_embedding(emb_matrix)
         self.bidirectional = bidirectional
         self.num_directions = 2 if bidirectional else 1
         self.num_layers = num_layers
@@ -49,17 +60,20 @@ class Encoder(nn.Module):
 
 # TODO : Takes input and produces out of same dimension our reference implementation
 class FusionBiLSTM(nn.Module):
-    def __init__(self, dropout_rate, hidden_size=100, num_layers=1, batch_size=1, bidirectional=True):
+    def __init__(self, dropout_rate,
+                    batch_size,
+                    num_layers,
+                    hidden_size):
+
         super(FusionBiLSTM, self).__init__()
 
-        self.bidirectional = bidirectional
-        self.num_directions = 2 if bidirectional else 1
+        self.num_directions = 2
         self.num_layers = num_layers
         self.batch_size = batch_size
         self.hidden_size = hidden_size
 
         self.fusion_bilstm = nn.GRU(input_size=hidden_size * 3, hidden_size=hidden_size, batch_first=True,
-                                    bidirectional=bidirectional)
+                                    bidirectional=True)
         self.hidden = self.init_hidden()
         self.dropout = nn.Dropout(p=dropout_rate)
 
@@ -79,8 +93,13 @@ class FusionBiLSTM(nn.Module):
 class DynamicDecoder(nn.Module):
     """Predicts start and end given embedding and computes loss"""
 
-    def __init__(self, device, hidden_size, batch_size, max_dec_steps,
-                    num_layers=1, bidirectional=False):
+    def __init__(self, device,
+                    hidden_size,
+                    batch_size,
+                    max_dec_steps,
+                    num_layers,
+                    bidirectional=False):
+
         super(DynamicDecoder, self).__init__()
 
         self.device = device
@@ -166,24 +185,38 @@ class DynamicDecoder(nn.Module):
 class CoattentionNetwork(nn.Module):
     def __init__(self, device,
                     hidden_size,
-                    num_layers,
                     batch_size,
-                    embeddings,
+                    emb_matrix,
+                    num_encoder_layers,
+                    num_fusion_bilstm_layers,
+                    num_decoder_layers,
                     max_dec_steps,
-                    fusion_dropout_rate=0.,
-                    bidrectional=False):
+                    fusion_dropout_rate,
+                    encoder_bidirectional=False,
+                    decoder_bidirectional=False):
+
         super(CoattentionNetwork, self).__init__()
 
         self.batch_size = batch_size
-        self.num_directions = 2 if bidrectional else 1
-        self.num_layers = num_layers
 
         self.fusion_bilstm = FusionBiLSTM(dropout_rate=fusion_dropout_rate,
-                        hidden_size=hidden_size)
-        self.encoder = Encoder(embeddings=embeddings, bidirectional=bidrectional,
-                        num_layers=num_layers, batch_size=batch_size)
-        self.decoder = DynamicDecoder(device=device, hidden_size=hidden_size, batch_size=batch_size,
-                        max_dec_steps=max_dec_steps, num_layers=num_layers, bidirectional=bidrectional)
+                        num_layers=num_fusion_bilstm_layers,
+                        hidden_size=hidden_size,
+                        batch_size=batch_size)
+
+        self.encoder = Encoder(emb_matrix=emb_matrix,
+                        hidden_size=hidden_size,
+                        bidirectional=encoder_bidirectional,
+                        num_layers=num_encoder_layers,
+                        batch_size=batch_size)
+
+        self.decoder = DynamicDecoder(device=device,
+                        hidden_size=hidden_size,
+                        batch_size=batch_size,
+                        max_dec_steps=max_dec_steps,
+                        num_layers=num_decoder_layers,
+                        bidirectional=decoder_bidirectional)
+
         self.fc_question = nn.Linear(hidden_size, hidden_size)  # l * ( n + 1)
 
     def forward(self, q_seq, q_mask, d_seq, d_mask, target_span=None):
@@ -208,14 +241,14 @@ class CoattentionNetwork(nn.Module):
         C_D_t = C_D.transpose(1, 2)
 
         bilstm_in = torch.cat((C_D_t, D), dim=2)
-        # TODO : Different than the other implementation of coattention
+
         U = self.fusion_bilstm(bilstm_in, d_mask)  # U : 2l x m
 
         loss, index_start, index_end = self.decoder(U, d_mask, target_span)
         return loss, index_start, index_end
 
-    def initHidden(self):
-        return torch.zeros(self.num_directions * self.num_layers, self.batch_size, self.hidden_size)
+    # def initHidden(self):
+    #     return torch.zeros(self.num_directions * self.num_layers, self.batch_size, self.hidden_size)
 
 
 # TODO : seems okay (for now) but risky to test
