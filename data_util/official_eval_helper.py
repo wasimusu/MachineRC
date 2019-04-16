@@ -23,7 +23,7 @@ import os
 
 import numpy as np
 from data_util.data_batcher import padded, Batch
-from nltk.tokenize.moses import MosesDetokenizer
+from sacremoses import MosesDetokenizer
 from six.moves import xrange
 from tqdm import tqdm
 from data_util.vocab import UNK_ID, PAD_ID
@@ -164,7 +164,7 @@ def preprocess_dataset(dataset):
         article_paragraphs = dataset['data'][articles_id]['paragraphs']
         for pid in range(len(article_paragraphs)):
 
-            context = unicode(article_paragraphs[pid]['context']) # string
+            context = str(article_paragraphs[pid]['context']) # string
 
             # The following replacements are suggested in the paper
             # BidAF (Seo et al., 2016)
@@ -180,7 +180,7 @@ def preprocess_dataset(dataset):
             for qn in qas:
 
                 # read the question text and tokenize
-                question = unicode(qn['question']) # string
+                question = str(qn['question']) # string
                 question_tokens = tokenize(question) # list of strings
 
                 # also get the question_uuid
@@ -207,17 +207,17 @@ def get_json_data(data_filename):
         raise Exception("JSON input file does not exist: %s" % data_filename)
 
     # Read the json file
-    print "Reading data from %s..." % data_filename
+    print("Reading data from %s..." % data_filename)
     data = data_from_json(data_filename)
 
     # Get the tokenized contexts and questions, and unique question identifiers
-    print "Preprocessing data from %s..." % data_filename
+    print("Preprocessing data from %s..." % data_filename)
     qn_uuid_data, context_token_data, qn_token_data = preprocess_dataset(data)
 
     data_size = len(qn_uuid_data)
     assert len(context_token_data) == data_size
     assert len(qn_token_data) == data_size
-    print "Finished preprocessing. Got %i examples from %s" % (data_size, data_filename)
+    print("Finished preprocessing. Got %i examples from %s" % (data_size, data_filename))
 
     return qn_uuid_data, context_token_data, qn_token_data
 
@@ -229,7 +229,7 @@ def generate_answers(config, model, processor, qn_uuid_data, context_token_data,
     batch_num = 0
     detokenizer = MosesDetokenizer()
 
-    print "Generating answers..."
+    print("Generating answers...")
 
     for batch in get_batch_generator(processor.word2id, qn_uuid_data, context_token_data, qn_token_data,
                                      config.batch_size, config.context_len, config.question_len):
@@ -261,8 +261,8 @@ def generate_answers(config, model, processor, qn_uuid_data, context_token_data,
         batch_num += 1
 
         if batch_num % 10 == 0:
-            print "Generated answers for %i/%i batches = %.2f%%" % (batch_num, num_batches, batch_num*100.0/num_batches)
+            print("Generated answers for %i/%i batches = %.2f%%" % (batch_num, num_batches, batch_num*100.0/num_batches))
 
-    print "Finished generating answers for dataset."
+    print("Finished generating answers for dataset.")
 
     return uuid2ans

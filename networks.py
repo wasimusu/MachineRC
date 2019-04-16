@@ -241,7 +241,7 @@ class HMN(nn.Module):
 
         step_loss = None
         if target:
-            # TODO: Fix this
+            # TODO: Fix this?
             step_loss = self.loss(index, target)
 
         return index, step_loss
