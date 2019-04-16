@@ -11,10 +11,10 @@ class Config:
         self.mode = "train"  # TODO: Why do we want this in config?
 
         # Device params
-        self.use_cuda = torch.cuda.is_available()
-        self.device = ('cuda' if self.use_cuda else 'cpu')
-        # self.device = 'cpu'
-        # self.use_cuda = False
+        # self.use_cuda = torch.cuda.is_available()
+        # self.device = ('cuda' if self.use_cuda else 'cpu')
+        self.device = 'cpu'
+        self.use_cuda = False
 
         # Global dimension params
         self.embedding_dim = 100

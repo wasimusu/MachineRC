@@ -57,14 +57,14 @@ class Encoder(nn.Module):
 
         # Convert the numbers into embeddings
         inputs = self.embeddings(inputs.to('cpu'))
-        packed = inputs
+        # packed = inputs
 
         # Get the sorted version of inputs as required for pack_padded_sequence
-        # inputs_sorted = torch.index_select(inputs, 0, lens_argsort)
+        inputs_sorted = torch.index_select(inputs, 0, lens_argsort)
 
-        # packed = pack_padded_sequence(inputs_sorted, lens, batch_first=True)
+        packed = pack_padded_sequence(inputs_sorted, lens_sorted, batch_first=True)
         output, self.hidden = self.encoder(packed, self.hidden)
-        # output, _ = pad_packed_sequence(output, batch_first=True)
+        output, _ = pad_packed_sequence(output, batch_first=True)
 
         # Restore batch elements to original order
         # output = torch.index_select(output, 0, lens_argsort_argsort)
@@ -119,8 +119,7 @@ class FusionBiLSTM(nn.Module):
         output = torch.index_select(output, 0, lens_argsort_argsort.to('cpu'))
 
         # Make output contiguous for speed of future operations
-        # TODO: Try without and time to see if this actually speeds up
-        output = output.contiguous()
+        # output = output.contiguous()
 
         output = self.dropout(output)
         return output
@@ -160,8 +159,6 @@ class DynamicDecoder(nn.Module):
                           batch_first=True,
                           num_layers=num_layers,
                           bidirectional=bidirectional)
-
-        # self.hidden = self.initHidden() # for GRU
 
     def forward(self, U, d_mask, target_span):
 
@@ -225,10 +222,6 @@ class DynamicDecoder(nn.Module):
             # Loss is the mean step loss
             loss = cumulative_loss / self.max_dec_steps
         return loss, s_i, e_i
-
-    # def initHidden(self):
-    #     return torch.zeros(self.num_directions * self.num_layers, self.batch_size, self.hidden_size)
-
 
 class CoattentionNetwork(nn.Module):
     def __init__(self, device,
