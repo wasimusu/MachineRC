@@ -33,9 +33,14 @@ class Encoder(nn.Module):
         self.batch_size = batch_size
         self.hidden_size = hidden_size
 
-        self.encoder = nn.GRU(input_size=hidden_size, hidden_size=hidden_size, bidirectional=bidirectional,
-                              num_layers=num_layers,
-                              batch_first=True)
+        # self.encoder = nn.GRU(input_size=hidden_size, hidden_size=hidden_size, bidirectional=bidirectional,
+        #                       num_layers=num_layers,
+        #                       batch_first=True)
+
+        self.encoder = nn.LSTM(input_size=hidden_size, hidden_size=hidden_size, bidirectional=bidirectional,
+                               num_layers=num_layers,
+                               batch_first=True)
+
         self.hidden = self.init_hidden()
         self.sentinel = nn.Parameter(torch.rand(hidden_size, ))
 
@@ -70,7 +75,10 @@ class Encoder(nn.Module):
         return output
 
     def init_hidden(self):
-        return torch.zeros(self.num_directions * self.num_layers, self.batch_size, self.hidden_size)
+        # return torch.zeros(self.num_directions * self.num_layers, self.batch_size, self.hidden_size)
+
+        return (torch.zeros(self.num_directions * self.num_layers, self.batch_size, self.hidden_size),
+                torch.zeros(self.num_directions * self.num_layers, self.batch_size, self.hidden_size))
 
 
 # TODO : Takes input and produces out of same dimension our reference implementation
@@ -86,9 +94,14 @@ class FusionBiLSTM(nn.Module):
         self.batch_size = batch_size
         self.hidden_size = hidden_size
 
-        self.fusion_bilstm = nn.GRU(num_layers=num_layers, input_size=hidden_size * 3, hidden_size=hidden_size,
-                                    batch_first=True,
-                                    bidirectional=True)
+        # self.fusion_bilstm = nn.GRU(num_layers=num_layers, input_size=hidden_size * 3, hidden_size=hidden_size,
+        #                             batch_first=True,
+        #                             bidirectional=True)
+
+        self.fusion_bilstm = nn.LSTM(num_layers=num_layers, input_size=hidden_size * 3, hidden_size=hidden_size,
+                                     batch_first=True,
+                                     bidirectional=True)
+
         self.hidden = self.init_hidden()
         self.dropout = nn.Dropout(p=dropout_rate)
 
@@ -122,7 +135,10 @@ class FusionBiLSTM(nn.Module):
         return output
 
     def init_hidden(self):
-        return torch.zeros(self.num_directions * self.num_layers, self.batch_size, self.hidden_size)
+        # return torch.zeros(self.num_directions * self.num_layers, self.batch_size, self.hidden_size)
+
+        return (torch.zeros(self.num_directions * self.num_layers, self.batch_size, self.hidden_size),
+                torch.zeros(self.num_directions * self.num_layers, self.batch_size, self.hidden_size))
 
 
 class DynamicDecoder(nn.Module):
@@ -194,10 +210,10 @@ class DynamicDecoder(nn.Module):
 
             # Get hidden state
             # TODO : There could be problem with the dimension
-            h_i = self.gru(u_cat.unsqueeze(1), h_i)[1]
+            output, h_i = self.gru(u_cat.unsqueeze(1), h_i)
 
             # Get new start estimate and start loss
-            s_i, _, start_loss_i = self.start_hmn(h_i, U, None, s_i, u_cat, None, s_target)
+            s_i, _, start_loss_i = self.start_hmn(output, U, None, s_i, u_cat, None, s_target)
             # s_i, start_loss_i = self.start_hmn(h_i, U, u_cat, s_target)
 
             # Update embedding at start estimate
@@ -207,7 +223,7 @@ class DynamicDecoder(nn.Module):
             u_cat = torch.cat((u_s_i, u_e_i), 1)  # batch_size x 4l
 
             # Get new end estimate and end loss
-            e_i, _, end_loss_i = self.end_hmn(h_i, U, None, e_i, u_cat, None, e_target)
+            e_i, _, end_loss_i = self.end_hmn(output, U, None, e_i, u_cat, None, e_target)
             # e_i, end_loss_i = self.end_hmn(h_i, U, u_cat, e_target)
 
             # Update cumulative loss if computing loss
@@ -219,6 +235,7 @@ class DynamicDecoder(nn.Module):
             # Loss is the mean step loss
             loss = cumulative_loss / self.max_dec_steps
         return loss, s_i, e_i
+
 
 class CoattentionNetwork(nn.Module):
     def __init__(self, device,
