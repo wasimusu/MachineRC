@@ -13,6 +13,7 @@ import networks as N
 from data_util.vocab import get_glove
 from data_util.data_batcher import get_batch_generator
 from data_util.evaluate import exact_match_score, f1_score
+from preprocessing.download_wordvecs import maybe_download
 from config import Config
 from data_utils import get_data
 from data_utils import timeit
@@ -21,7 +22,11 @@ config = Config()
 
 # Embeddings and word2id and id2word
 glove_path = os.path.join(config.vectors_cache, "glove.6B.{}d.txt".format(config.embedding_dim))
-# if not os.path.exists(glove_path):
+if not os.path.exists(glove_path):
+    print("\nDownloading wordvecs to {}".format(config.vectors_cache))
+    if not os.path.exists(config.vectors_cache):
+        os.makedirs(config.vectors_cache)
+    maybe_download(config.glove_base_url, config.glove_filename, config.vectors_cache, 862182613)
 
 emb_matrix, word2index, index2word = get_glove(glove_path, config.embedding_dim)
 
