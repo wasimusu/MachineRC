@@ -21,6 +21,8 @@ config = Config()
 
 # Embeddings and word2id and id2word
 glove_path = os.path.join(config.vectors_cache, "glove.6B.{}d.txt".format(config.embedding_dim))
+# if not os.path.exists(glove_path):
+
 emb_matrix, word2index, index2word = get_glove(glove_path, config.embedding_dim)
 
 train_context_path = os.path.join(config.data_dir, "train.context")

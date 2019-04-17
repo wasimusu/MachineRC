@@ -17,14 +17,14 @@ class Config:
         self.use_cuda = False
 
         # Global dimension params
-        self.embedding_dim = 50
+        self.embedding_dim = 100
         self.hidden_size = self.embedding_dim
-        self.context_len = 200  # TODO: Why do we need this?
-        self.question_len = 20  # TODO: Why do we need this?
+        self.context_len = 600  # TODO: Why do we need this?
+        self.question_len = 30  # TODO: Why do we need this?
 
         # Training params
         self.num_epochs = 10
-        self.learning_rate = 0.001
+        self.learning_rate = 0.0001
         self.batch_size = 16
         self.l2_norm = 0.1
 
@@ -33,7 +33,7 @@ class Config:
         self.encoder_bidirectional = False
         # Fusion BiLSTM params
         self.num_fusion_bilstm_layers = 2
-        self.fusion_dropout_rate = 0.
+        self.fusion_dropout_rate = 0.1
 
         # Decoder params
         self.max_dec_steps = 6

@@ -17,7 +17,7 @@
 import zipfile
 import argparse
 import os
-from squad_preprocess import maybe_download
+from .squad_preprocess import maybe_download
 
 def setup_args():
     parser = argparse.ArgumentParser()
