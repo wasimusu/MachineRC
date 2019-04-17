@@ -2,14 +2,12 @@
 Train the Coattention Network for Query Answering
 """
 import os
-import time
 import json
 
 import torch
 import torch.optim as optim
 from torch.nn.utils import clip_grad_norm_
 
-import squad
 import networks as N
 from data_util.vocab import get_glove
 from data_util.data_batcher import get_batch_generator
@@ -96,11 +94,14 @@ def train(context_path, qn_path, ans_path):
 
     # Select the parameters which require grad / backpropagation
     params = list(filter(lambda p: p.requires_grad, model.parameters()))
-    optimizer = optim.Adam(params, lr=config.learning_rate)
+    optimizer = optim.Adam(params, lr=config.learning_rate, weight_decay=config.l2_norm)
 
     # Set up directories for this experiment
-    experiment_dir = os.path.join(config.experiments_root_dir,
-                                  'experiment_%d' % (int(time.time())))
+    serial_number = len(os.listdir(config.experiments_root_dir))
+    if config.restore:
+        serial_number -= 1  # Check into the latest model
+    experiment_dir = os.path.join(config.experiments_root_dir, 'experiment_{}'.format(serial_number))
+
     if not os.path.exists(experiment_dir):
         os.makedirs(experiment_dir)
     model_dir = os.path.join(experiment_dir, 'model')
@@ -114,49 +115,51 @@ def train(context_path, qn_path, ans_path):
     with open(os.path.join(experiment_dir, "config.json"), 'w') as fout:
         json.dump(vars(config), fout)
 
-    checkpoint_name = "checkpoint-Embed{}-ep{}-iter{}".format(config.embedding_dim, 2, 1000)
+    iteration = 0
+    if config.restore:
+        saved_models = os.listdir(model_dir)
+        if len(saved_models):
+            print(saved_models)
+            saved_models = [int(name.split('-')[-1]) for name in saved_models]
+            latest_iter = max(saved_models)
+            checkpoint_name = "checkpoint-embed{}-iter-{}".format(config.embedding_dim, latest_iter)
+            checkpoint_name = os.path.join(model_dir, checkpoint_name)
 
-    # If the network has saved model, restore it
-    if os.path.exists(checkpoint_name):
-        state = torch.load(checkpoint_name)
-        model.load_state_dict(state['model'])
-        optimizer.load_state_dict(state['optimizer'])
-        start_epoch = state['epoch']
-        i = state['iter']
-        current_loss = state['loss']
-        print("Model restored from ", checkpoint_name)
-        print("Epoch : {}\tIter {}\t\tloss : {}".format(start_epoch, i, current_loss))
-    else:
-        print("Training with fresh parameters")
+            state = torch.load(checkpoint_name)
+            model.load_state_dict(state['model'])
+            optimizer.load_state_dict(state['optimizer'])
+            iteration = state['iter']
+            current_loss = state['current_loss']
+            print("Model restored from ", checkpoint_name)
+        else:
+            print("Training with fresh parameters")
 
-    # For each epoch
-    for epoch in range(config.num_epochs):
-        # For each batch
-        for i, batch in enumerate(get_batch_generator(word2index, context_path, qn_path, ans_path,
-                                                      config.batch_size, config.context_len,
-                                                      config.question_len, discard_long=True)):
+    for batch in get_batch_generator(word2index, context_path, qn_path, ans_path,
+                                     config.batch_size, config.context_len,
+                                     config.question_len, discard_long=True):
 
-            # Take step in training
-            loss = step(model, optimizer, batch, params)
+        # Take step in training
+        loss = step(model, optimizer, batch, params)
 
-            # Displaying results
-            if i % config.print_every == 0:
-                f1 = evaluate(model, batch)
-                print("Epoch : {}\tIter {}\t\tloss : {}\tf1 : {}".format(epoch, i, "%.2f" % loss, "%.2f" % f1))
-                # Maybe you want to do random evaluations as well for sanity check
+        # Displaying results
+        if iteration % config.print_every == 0:
+            f1 = evaluate(model, batch)
+            print("Iter {}\t\tloss : {}\tf1 : {}".format(iteration, "%.2f" % loss, "%.2f" % f1))
+            # Maybe you want to do random evaluations as well for sanity check
 
-            # Saving the model
-            if i % config.save_every == 0:
-                state = {
-                    'iter': i,
-                    'epoch': epoch,
-                    'model': model.state_dict(),
-                    'optimizer': optimizer.state_dict(),
-                    'current_loss': loss
-                }
-                checkpoint_name = "checkpoint-Embed{}-ep{}-iter{}".format(config.embedding_dim, epoch, i)
-                fname = os.path.join(model_dir, checkpoint_name)
-                torch.save(state, fname)
+        # Saving the model
+        if iteration % config.save_every == 0:
+            state = {
+                'iter': iteration,
+                'model': model.state_dict(),
+                'optimizer': optimizer.state_dict(),
+                'loss': loss
+            }
+            checkpoint_name = "checkpoint-embed{}-iter-{}".format(config.embedding_dim, iteration)
+
+            fname = os.path.join(model_dir, checkpoint_name)
+            torch.save(state, fname)
+        iteration += 1
 
 
 if __name__ == '__main__':

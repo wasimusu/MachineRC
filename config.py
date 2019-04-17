@@ -11,22 +11,22 @@ class Config:
         self.mode = "dev"
 
         # Device params
-        # self.use_cuda = torch.cuda.is_available()
-        # self.device = ('cuda' if self.use_cuda else 'cpu')
+        self.use_cuda = torch.cuda.is_available()
+        self.device = ('cuda' if self.use_cuda else 'cpu')
         self.device = 'cpu'
         self.use_cuda = False
 
         # Global dimension params
-        self.embedding_dim = 300
+        self.embedding_dim = 100
         self.hidden_size = self.embedding_dim
         self.context_len = 600
         self.question_len = 30
 
         # Training params
         self.num_epochs = 10
-        self.learning_rate = 0.0001
-        self.batch_size = 16
-        self.l2_norm = 0.00007
+        self.learning_rate = 0.00001
+        self.batch_size = 32
+        self.l2_norm = 0.1
         self.max_grad_norm = 5
 
         # Encoder params
@@ -56,3 +56,6 @@ class Config:
         # Vectors
         self.glove_base_url = "http://nlp.stanford.edu/data/"
         self.glove_filename = "glove.6B.zip"
+
+        # Restore or run a fresh training
+        self.restore = True
