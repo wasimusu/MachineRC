@@ -27,6 +27,7 @@ class Config:
         self.learning_rate = 0.0001
         self.batch_size = 16
         self.l2_norm = 0.00007
+        self.max_grad_norm = 5
 
         # Encoder params
         self.num_encoder_layers = 2
