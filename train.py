@@ -56,7 +56,7 @@ def evaluate():
     pass
 
 
-def train(*args, **kwargs):
+def train(context_path, qn_path, ans_path):
     """ Train the network """
 
     model = N.CoattentionNetwork(device=config.device,
@@ -109,8 +109,7 @@ def train(*args, **kwargs):
     # For each epoch
     for epoch in range(config.num_epochs):
         # For each batch
-        for i, batch in enumerate(get_batch_generator(word2index, train_context_path,
-                                                      train_qn_path, train_ans_path,
+        for i, batch in enumerate(get_batch_generator(word2index, context_path, qn_path, ans_path,
                                                       config.batch_size, config.context_len,
                                                       config.question_len, discard_long=True)):
             # Take step in training
@@ -136,4 +135,12 @@ def train(*args, **kwargs):
 
 
 if __name__ == '__main__':
-    train()
+    if config.mode == 'train':
+        context_path = train_context_path
+        qn_path = train_qn_path
+        ans_path = train_ans_path
+    else:
+        context_path = dev_context_path
+        qn_path = dev_qn_path
+        ans_path = dev_ans_path
+    train(context_path, qn_path, ans_path)
