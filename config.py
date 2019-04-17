@@ -17,10 +17,10 @@ class Config:
         self.use_cuda = False
 
         # Global dimension params
-        self.embedding_dim = 200
+        self.embedding_dim = 300
         self.hidden_size = self.embedding_dim
-        self.context_len = 600  # TODO: Why do we need this?
-        self.question_len = 30  # TODO: Why do we need this?
+        self.context_len = 600
+        self.question_len = 30
 
         # Training params
         self.num_epochs = 10
