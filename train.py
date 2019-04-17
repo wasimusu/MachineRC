@@ -79,7 +79,6 @@ def evaluate(model, batch):
 
 def train(context_path, qn_path, ans_path):
     """ Train the network """
-
     model = N.CoattentionNetwork(device=config.device,
                                  hidden_size=config.hidden_size,
                                  emb_matrix=emb_matrix,
@@ -94,9 +93,12 @@ def train(context_path, qn_path, ans_path):
 
     # Select the parameters which require grad / backpropagation
     params = list(filter(lambda p: p.requires_grad, model.parameters()))
-    optimizer = optim.Adam(params, lr=config.learning_rate, weight_decay=config.l2_norm)
+    optimizer = optim.SGD(params, lr=config.learning_rate, weight_decay=config.l2_norm)
 
     # Set up directories for this experiment
+    if not os.path.exists(config.experiments_root_dir):
+        os.makedirs(config.experiments_root_dir)
+
     serial_number = len(os.listdir(config.experiments_root_dir))
     if config.restore:
         serial_number -= 1  # Check into the latest model

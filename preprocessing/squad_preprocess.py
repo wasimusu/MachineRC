@@ -44,7 +44,7 @@ def write_to_file(out_file, line):
 
 def data_from_json(filename):
     """Loads JSON data from filename and returns"""
-    with open(filename) as data_file:
+    with open(filename, encoding='utf8') as data_file:
         data = json.load(data_file)
     return data
 
@@ -239,10 +239,10 @@ def preprocess_and_write(dataset, tier, out_dir):
     indices = list(range(len(examples)))
     np.random.shuffle(indices)
 
-    with open(os.path.join(out_dir, tier +'.context'), 'w') as context_file,  \
-         open(os.path.join(out_dir, tier +'.question'), 'w') as question_file,\
-         open(os.path.join(out_dir, tier +'.answer'), 'w') as ans_text_file, \
-         open(os.path.join(out_dir, tier +'.span'), 'w') as span_file:
+    with open(os.path.join(out_dir, tier +'.context'), 'w', encoding='utf8') as context_file,  \
+         open(os.path.join(out_dir, tier +'.question'), 'w', encoding='utf8') as question_file,\
+         open(os.path.join(out_dir, tier +'.answer'), 'w', encoding='utf8') as ans_text_file, \
+         open(os.path.join(out_dir, tier +'.span'), 'w', encoding='utf8') as span_file:
 
         for i in indices:
             (context, question, answer, answer_span) = examples[i]

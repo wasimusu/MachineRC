@@ -17,7 +17,7 @@ class Config:
         self.use_cuda = False
 
         # Global dimension params
-        self.embedding_dim = 100
+        self.embedding_dim = 50
         self.hidden_size = self.embedding_dim
         self.context_len = 600
         self.question_len = 30
