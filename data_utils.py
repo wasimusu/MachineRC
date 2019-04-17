@@ -23,8 +23,7 @@ def get_data(batch, is_train=True):
     qn_seq_var = torch.from_numpy(batch.qn_ids).long()
     context_seq_var = torch.from_numpy(batch.context_ids).long()
 
-    if config.mode == "train":
-        span_var = torch.from_numpy(batch.ans_span).long()
+    span_var = torch.from_numpy(batch.ans_span).long()
 
     if is_train:
         qn_mask_var = qn_mask_var.to(config.device)
@@ -34,10 +33,7 @@ def get_data(batch, is_train=True):
         if is_train:
             span_var = span_var.to(config.device)
 
-    if config.mode == "train":
-        return qn_seq_var, qn_mask_var, context_seq_var, context_mask_var, span_var
-    else:
-        return qn_seq_var, qn_mask_var, context_seq_var, context_mask_var
+    return qn_seq_var, qn_mask_var, context_seq_var, context_mask_var, span_var
 
 
 import time

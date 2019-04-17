@@ -8,7 +8,7 @@ class Config:
     def __init__(self):
         """Expirement configuration"""
 
-        self.mode = "train"  # TODO: Why do we want this in config?
+        self.mode = "dev"
 
         # Device params
         # self.use_cuda = torch.cuda.is_available()
@@ -17,7 +17,7 @@ class Config:
         self.use_cuda = False
 
         # Global dimension params
-        self.embedding_dim = 100
+        self.embedding_dim = 50
         self.hidden_size = self.embedding_dim
         self.context_len = 200  # TODO: Why do we need this?
         self.question_len = 20  # TODO: Why do we need this?
