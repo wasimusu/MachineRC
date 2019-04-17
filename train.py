@@ -31,7 +31,6 @@ dev_qn_path = os.path.join(config.data_dir, "dev.question")
 dev_ans_path = os.path.join(config.data_dir, "dev.span")
 
 
-@timeit
 def step(model, optimizer, batch):
     """
     One batch of training
@@ -48,12 +47,27 @@ def step(model, optimizer, batch):
     return loss
 
 
-def evaluate():
+def evaluate(model, batch):
     """
     Evaluate the training and test set accuracy
     :return:
     """
-    pass
+    # Here goes one batch of training
+    q_seq, q_mask, d_seq, d_mask, target_span = get_data(batch, config.mode.lower() == 'train')
+    with torch.no_grad():
+        # The loss is individual loss for each pair of question, context and answer
+        loss, start_pos_pred, end_pos_pred = model(q_seq, q_mask, d_seq, d_mask, target_span)
+        start_pos_pred = start_pos_pred.tolist()
+        end_pos_pred = end_pos_pred.tolist()
+        f1 = 0
+        for i, (pred_ans_start, pred_ans_end, true_ans_tokens) in enumerate(
+                zip(start_pos_pred, end_pos_pred, batch.ans_tokens)):
+            pred_ans_tokens = batch.context_tokens[i][pred_ans_start: pred_ans_end + 1]
+            prediction = " ".join(pred_ans_tokens)
+            ground_truth = " ".join(true_ans_tokens)
+            f1 += f1_score(prediction, ground_truth)
+        f1 = f1 / (i + 1)
+        return f1
 
 
 def train(context_path, qn_path, ans_path):
@@ -112,16 +126,18 @@ def train(context_path, qn_path, ans_path):
         for i, batch in enumerate(get_batch_generator(word2index, context_path, qn_path, ans_path,
                                                       config.batch_size, config.context_len,
                                                       config.question_len, discard_long=True)):
+
             # Take step in training
             loss = step(model, optimizer, batch)
 
             # Displaying results
-            if config.print_every:
-                print("Epoch : {}\tIter {}\t\tloss : {}".format(epoch, i, "%.2f" % loss))
+            if i % config.print_every == 0:
+                f1 = evaluate(model, batch)
+                print("Epoch : {}\tIter {}\t\tloss : {}\tf1 : {}".format(epoch, i, "%.2f" % loss, "%.2f" % f1))
                 # Maybe you want to do random evaluations as well for sanity check
 
             # Saving the model
-            if config.save_every:
+            if i % config.save_every == 0:
                 state = {
                     'iter': i,
                     'epoch': epoch,

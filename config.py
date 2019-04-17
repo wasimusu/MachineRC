@@ -49,5 +49,5 @@ class Config:
         self.experiments_root_dir = "experiments/"
 
         # Logs
-        self.print_every = 100
-        self.save_every = 1000
+        self.print_every = 5
+        self.save_every = 100
