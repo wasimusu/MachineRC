@@ -7,6 +7,7 @@ import json
 
 import torch
 import torch.optim as optim
+from torch.nn.utils import clip_grad_norm_
 
 import squad
 import networks as N
@@ -33,7 +34,7 @@ dev_qn_path = os.path.join(config.data_dir, "dev.question")
 dev_ans_path = os.path.join(config.data_dir, "dev.span")
 
 
-def step(model, optimizer, batch):
+def step(model, optimizer, batch, params):
     """
     One batch of training
     :return: loss
@@ -45,6 +46,7 @@ def step(model, optimizer, batch):
     loss, _, _ = model(q_seq, q_mask, d_seq, d_mask, target_span)
     loss = torch.sum(loss)
     loss.backward(retain_graph=True)
+    clip_grad_norm_(params, config.max_grad_norm)
     optimizer.step()
     return loss
 
@@ -130,7 +132,7 @@ def train(context_path, qn_path, ans_path):
                                                       config.question_len, discard_long=True)):
 
             # Take step in training
-            loss = step(model, optimizer, batch)
+            loss = step(model, optimizer, batch, params)
 
             # Displaying results
             if i % config.print_every == 0:

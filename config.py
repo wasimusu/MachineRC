@@ -26,7 +26,8 @@ class Config:
         self.num_epochs = 10
         self.learning_rate = 0.0001
         self.batch_size = 16
-        self.l2_norm = 0.1
+        self.l2_norm = 0.00001
+        self.max_grad_norm = 5
 
         # Encoder params
         self.num_encoder_layers = 2
@@ -36,7 +37,7 @@ class Config:
         self.fusion_dropout_rate = 0.1
 
         # Decoder params
-        self.max_dec_steps = 6
+        self.max_dec_steps = 2
         self.num_decoder_layers = 1
         self.decoder_bidirectional = False
 
