@@ -138,6 +138,10 @@ def train(context_path, qn_path, ans_path):
                                      config.batch_size, config.context_len,
                                      config.question_len, discard_long=True):
 
+        # When the batch is partially filled, ignore it.
+        if len(batch) < config.batch_size:
+            continue
+
         # Take step in training
         loss = step(model, optimizer, batch, params)
 
