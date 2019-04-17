@@ -17,16 +17,16 @@ class Config:
         self.use_cuda = False
 
         # Global dimension params
-        self.embedding_dim = 100
+        self.embedding_dim = 300
         self.hidden_size = self.embedding_dim
-        self.context_len = 600  # TODO: Why do we need this?
-        self.question_len = 30  # TODO: Why do we need this?
+        self.context_len = 600
+        self.question_len = 30
 
         # Training params
         self.num_epochs = 10
         self.learning_rate = 0.0001
         self.batch_size = 16
-        self.l2_norm = 0.00001
+        self.l2_norm = 0.00007
         self.max_grad_norm = 5
 
         # Encoder params
@@ -37,7 +37,7 @@ class Config:
         self.fusion_dropout_rate = 0.1
 
         # Decoder params
-        self.max_dec_steps = 2
+        self.max_dec_steps = 4
         self.num_decoder_layers = 1
         self.decoder_bidirectional = False
 
@@ -52,3 +52,7 @@ class Config:
         # Logs
         self.print_every = 5
         self.save_every = 100
+
+        # Vectors
+        self.glove_base_url = "http://nlp.stanford.edu/data/"
+        self.glove_filename = "glove.6B.zip"
