@@ -26,9 +26,6 @@ class Encoder(nn.Module):
                  bidirectional=False):
         super(Encoder, self).__init__()
 
-        # TODO : The bottom line is testing stuff
-        # self.embeddings = nn.Embedding(10, hidden_size)     # Just put here to test things out
-
         self.embeddings = self.get_pretrained_embedding(emb_matrix)
         self.bidirectional = bidirectional
         self.num_directions = 2 if bidirectional else 1
