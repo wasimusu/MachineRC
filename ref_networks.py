@@ -1,3 +1,7 @@
+"""
+Source : https://github.com/atulkum/co-attention
+"""
+
 from __future__ import unicode_literals, print_function, division
 
 import torch

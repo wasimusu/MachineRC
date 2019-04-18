@@ -368,6 +368,11 @@ class HMN(nn.Module):
 
 
 class MaxOutHighway(nn.Module):
+    """
+    Source for this class : https://github.com/atulkum/co-attention
+    Cause our had some bugs and need some fixing to be done.
+    """
+
     def __init__(self, hidden_dim, maxout_pool_size):
         super(MaxOutHighway, self).__init__()
         self.hidden_dim = hidden_dim
