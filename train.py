@@ -137,40 +137,41 @@ def train(context_path, qn_path, ans_path):
         else:
             print("Training with fresh parameters")
 
-    for batch in get_batch_generator(word2index, context_path, qn_path, ans_path,
-                                     config.batch_size, config.context_len,
-                                     config.question_len, discard_long=True):
+    for epoch in range(config.num_epochs):
+        for batch in get_batch_generator(word2index, context_path, qn_path, ans_path,
+                                         config.batch_size, config.context_len,
+                                         config.question_len, discard_long=True):
 
-        # When the batch is partially filled, ignore it.
-        if batch.batch_size < config.batch_size:
-            continue
+            # When the batch is partially filled, ignore it.
+            if batch.batch_size < config.batch_size:
+                continue
 
-        # Take step in training
-        loss = step(model, optimizer, batch, params)
+            # Take step in training
+            loss = step(model, optimizer, batch, params)
 
-        # Displaying results
-        if iteration % config.evaluate_every == 0 and iteration % config.print_every != 0:
-            print("Iter {}\t\tloss : {}\tf1 : {}".format(iteration, "%.2f" % loss, "%.2f" % -1))
+            # Displaying results
+            if iteration % config.evaluate_every == 0 and iteration % config.print_every != 0:
+                print("Iter {}\t\tloss : {}\tf1 : {}".format(iteration, "%.2f" % loss, "%.2f" % -1))
 
-        if iteration % config.evaluate_every == 0:
-            f1 = evaluate(model, batch)
-            print("Iter {}\t\tloss : {}\tf1 : {}".format(iteration, "%.2f" % loss, "%.2f" % f1))
+            if iteration % config.evaluate_every == 0:
+                f1 = evaluate(model, batch)
+                print("Iter {}\t\tloss : {}\tf1 : {}".format(iteration, "%.2f" % loss, "%.2f" % f1))
 
-            # Maybe you want to do random evaluations as well for sanity check
+                # Maybe you want to do random evaluations as well for sanity check
 
-        # Saving the model
-        if iteration % config.save_every == 0:
-            state = {
-                'iter': iteration,
-                'model': model.state_dict(),
-                'optimizer': optimizer.state_dict(),
-                'loss': loss
-            }
-            checkpoint_name = "checkpoint-embed{}-iter-{}".format(config.embedding_dim, iteration)
+            # Saving the model
+            if iteration % config.save_every == 0:
+                state = {
+                    'iter': iteration,
+                    'model': model.state_dict(),
+                    'optimizer': optimizer.state_dict(),
+                    'loss': loss
+                }
+                checkpoint_name = "checkpoint-embed{}-iter-{}".format(config.embedding_dim, iteration)
 
-            fname = os.path.join(model_dir, checkpoint_name)
-            torch.save(state, fname)
-        iteration += 1
+                fname = os.path.join(model_dir, checkpoint_name)
+                torch.save(state, fname)
+            iteration += 1
 
 
 if __name__ == '__main__':
