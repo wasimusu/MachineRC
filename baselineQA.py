@@ -88,10 +88,12 @@ class BaselineQA:
         self.vectorizer = pickle.load(open(vector_file, mode='rb'))
         self.vocab = open(vocab_file, mode='r').read().splitlines()
 
-    def evaluate(self, thresh=0.1):
+    def evaluate(self, thresh=0.05):
         dataset = squad.Squad(train=True)
         prediction = []
         for index, [context, qas] in enumerate(dataset):
+            if index % 100 == 0:
+                print(index)
             contexts = []
             for sentence in sent_tokenizer.tokenize(context):
                 sentence = tokenize(sentence)
@@ -109,16 +111,16 @@ class BaselineQA:
                 scores = [cosine_similarity(question_vec, vec).flatten() for vec in context_vec]
                 scores = np.asarray(scores).flatten()
 
-                # print("Scores : ", scores)
                 ranks = np.argsort(scores)[::-1]
-                if scores[ranks[0]] < thresh:
+
+                if scores[ranks[0]] > thresh:
                     prediction.append(is_correct(contexts, ranks[0], answer_start, answer_end))
         accuracy = sum(prediction) / len(prediction)
         print(accuracy)
 
 
 if __name__ == '__main__':
-    compute_vectors()
+    # compute_vectors()
 
     print("Computing accuracy of the model") 
     baseline = BaselineQA()
