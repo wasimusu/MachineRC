@@ -3,5 +3,6 @@
 torch
 torchtext
 spacy
+sacremoses
 
 # python -m spacy download en

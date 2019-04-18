@@ -8,14 +8,13 @@ import torch
 import torch.optim as optim
 from torch.nn.utils import clip_grad_norm_
 
-import networks as N
+import ref_networks as N
 from data_util.vocab import get_glove
 from data_util.data_batcher import get_batch_generator
 from data_util.evaluate import exact_match_score, f1_score
 from preprocessing.download_wordvecs import maybe_download
 from config import Config
 from data_utils import get_data
-from data_utils import timeit
 
 config = Config()
 
@@ -81,17 +80,13 @@ def evaluate(model, batch):
 
 def train(context_path, qn_path, ans_path):
     """ Train the network """
-    model = N.CoattentionNetwork(device=config.device,
-                                 hidden_size=config.hidden_size,
-                                 emb_matrix=emb_matrix,
-                                 num_encoder_layers=config.num_encoder_layers,
-                                 num_fusion_bilstm_layers=config.num_fusion_bilstm_layers,
-                                 num_decoder_layers=config.num_decoder_layers,
-                                 batch_size=config.batch_size,
-                                 max_dec_steps=config.max_dec_steps,
-                                 fusion_dropout_rate=config.fusion_dropout_rate,
-                                 encoder_bidirectional=config.encoder_bidirectional,
-                                 decoder_bidirectional=config.decoder_bidirectional)
+    model = N.CoattentionModel(
+        hidden_dim=config.hidden_size,
+        maxout_pool_size=config.max_pool_size,
+        emb_matrix=emb_matrix,
+        max_dec_steps=config.max_dec_steps,
+        dropout_ratio=config.fusion_dropout_rate
+    )
 
     # Select the parameters which require grad / backpropagation
     params = list(filter(lambda p: p.requires_grad, model.parameters()))
