@@ -47,11 +47,14 @@ def step(model, optimizer, batch, params):
     q_seq, q_mask, d_seq, d_mask, target_span = get_data(batch, config.mode.lower() == 'train')
     model.zero_grad()
     # The loss is individual loss for each pair of question, context and answer
-    loss, _, _ = model(q_seq, q_mask, d_seq, d_mask, target_span)
+    loss, start_pos, end_pos = model(q_seq, q_mask, d_seq, d_mask, target_span)
     loss = torch.sum(loss)
-    loss.backward(retain_graph=True)
+    loss.backward(retain_graph=True)  # TODO : Is this causing memory consumption to increase
     clip_grad_norm_(params, config.max_grad_norm)
     optimizer.step()
+
+    del start_pos, end_pos
+    del q_mask, q_seq, d_mask, d_seq, target_span
     return loss
 
 
@@ -111,9 +114,6 @@ def train(context_path, qn_path, ans_path):
     model_dir = os.path.join(experiment_dir, 'model')
     if not os.path.exists(model_dir):
         os.makedirs(model_dir)
-    bestmodel_dir = os.path.join(experiment_dir, 'bestmodel')
-    if not os.path.exists(bestmodel_dir):
-        os.makedirs(bestmodel_dir)
 
     # Save config as config.json
     with open(os.path.join(experiment_dir, "config.json"), 'w') as fout:
@@ -144,6 +144,7 @@ def train(context_path, qn_path, ans_path):
 
             # When the batch is partially filled, ignore it.
             if batch.batch_size < config.batch_size:
+                del batch
                 continue
 
             # Take step in training
@@ -171,6 +172,8 @@ def train(context_path, qn_path, ans_path):
 
                 fname = os.path.join(model_dir, checkpoint_name)
                 torch.save(state, fname)
+
+            del loss
             iteration += 1
 
 

@@ -394,7 +394,7 @@ class MaxOutHighway(nn.Module):
     def forward(self, h_i, U, curr_mask, idx_i_1, u_cat, mask_mult, target=None):
         b, m, _ = list(U.size())
 
-        r = F.tanh(self.r(torch.cat((h_i.view(-1, self.hidden_dim), u_cat), 1)))  # b x 5l => b x l
+        r = torch.tanh(self.r(torch.cat((h_i.view(-1, self.hidden_dim), u_cat), 1)))  # b x 5l => b x l
         # r = self.dropout_r(r)
 
         r_expanded = r.unsqueeze(1).expand(b, m, self.hidden_dim).contiguous()  # b x m x l
