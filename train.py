@@ -139,8 +139,8 @@ def train(context_path, qn_path, ans_path):
 
     for epoch in range(config.num_epochs):
         for batch in get_batch_generator(word2index, context_path, qn_path, ans_path,
-                                         config.batch_size, config.context_len,
-                                         config.question_len, discard_long=True):
+                                                   config.batch_size, config.context_len,
+                                                   config.question_len, discard_long=True):
 
             # When the batch is partially filled, ignore it.
             if batch.batch_size < config.batch_size:
@@ -151,13 +151,12 @@ def train(context_path, qn_path, ans_path):
             loss = step(model, optimizer, batch, params)
 
             # Displaying results
-            if iteration % config.evaluate_every == 0 and iteration % config.print_every != 0:
+            if iteration % config.print_every == 0:
                 print("Iter {}\t\tloss : {}\tf1 : {}".format(iteration, "%.2f" % loss, "%.2f" % -1))
 
             if iteration % config.evaluate_every == 0:
                 f1 = evaluate(model, batch)
                 print("Iter {}\t\tloss : {}\tf1 : {}".format(iteration, "%.2f" % loss, "%.2f" % f1))
-
                 # Maybe you want to do random evaluations as well for sanity check
 
             # Saving the model

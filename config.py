@@ -17,17 +17,17 @@ class Config:
         self.use_cuda = False
 
         # Global dimension params
-        self.embedding_dim = 200
+        self.embedding_dim = 100
         self.hidden_size = self.embedding_dim
         self.context_len = 600
         self.question_len = 30
 
         # Training params
-        self.num_epochs = 10
+        self.num_epochs = 20
         self.learning_rate = 0.001
-        self.batch_size = 32
+        self.batch_size = 1
         self.l2_norm = 0.1
-        self.max_grad_norm = 5
+        self.max_grad_norm = 50
 
         # Encoder params
         self.num_encoder_layers = 2
@@ -50,9 +50,9 @@ class Config:
         self.experiments_root_dir = "experiments/"
 
         # Logs
-        self.print_every = 5
+        self.print_every = 10
         self.save_every = 100
-        self.evaluate_every = 20
+        self.evaluate_every = 1
 
         # Vectors
         self.glove_base_url = "http://nlp.stanford.edu/data/"
