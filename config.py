@@ -19,22 +19,22 @@ class Config:
         # Global dimension params
         self.embedding_dim = 100
         self.hidden_size = self.embedding_dim
-        self.context_len = 600
-        self.question_len = 30
+        self.context_len = 200
+        self.question_len = 100
 
         # Training params
-        self.num_epochs = 20
-        self.learning_rate = 0.001
+        self.num_epochs = 200
+        self.learning_rate = 0.1
         self.batch_size = 1
-        self.l2_norm = 0.1
-        self.max_grad_norm = 50
+        self.l2_norm = 0.001  # 0.35
+        self.max_grad_norm = 50  # 50
 
         # Encoder params
         self.num_encoder_layers = 2
         self.encoder_bidirectional = False
         # Fusion BiLSTM params
         self.num_fusion_bilstm_layers = 2
-        self.fusion_dropout_rate = 0.1
+        self.fusion_dropout_rate = 0.00  # Other values will cause oscillation
 
         # Decoder params
         self.max_dec_steps = 4
@@ -59,4 +59,4 @@ class Config:
         self.glove_filename = "glove.6B.zip"
 
         # Restore or run a fresh training
-        self.restore = True
+        self.restore = False
