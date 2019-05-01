@@ -17,7 +17,7 @@ class Config:
         self.use_cuda = False
 
         # Global dimension params
-        self.embedding_dim = 100
+        self.embedding_dim = 100    # 200 did not help
         self.hidden_size = self.embedding_dim
         self.context_len = 200
         self.question_len = 100
@@ -25,16 +25,16 @@ class Config:
         # Training params
         self.num_epochs = 200
         self.learning_rate = 0.1
-        self.batch_size = 1
-        self.l2_norm = 0.001  # 0.35
-        self.max_grad_norm = 50  # 50
+        self.batch_size = 5
+        self.l2_norm = 0.0  # l2 is not helping at all.
+        self.max_grad_norm = 50
 
         # Encoder params
         self.num_encoder_layers = 2
         self.encoder_bidirectional = False
         # Fusion BiLSTM params
         self.num_fusion_bilstm_layers = 2
-        self.fusion_dropout_rate = 0.00  # Other values will cause oscillation
+        self.fusion_dropout_rate = 0.0  # Other values will cause oscillation
 
         # Decoder params
         self.max_dec_steps = 4
